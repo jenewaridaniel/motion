@@ -7,6 +7,7 @@
  * files often have no length in them).
  */
 import { encodeWav, type Micros, projectDuration } from "@motion/core";
+import { encodeVoice } from "@motion/media";
 import { create } from "zustand";
 import { engine } from "../lib/engine.ts";
 import { importFiles } from "./media.ts";
@@ -130,7 +131,15 @@ export async function stopVoiceover(): Promise<void> {
   const n =
     Object.values(project.assets).filter((a) => a.name.startsWith("Voiceover"))
       .length + 1;
-  const file = new File([encodeWav([samples], rate)], `Voiceover ${n}.wav`, {
+  const name = `Voiceover ${n}`;
+  // Compressed (about 8× smaller); WAV only if the browser can't encode.
+  let file: File | null = null;
+  try {
+    file = await encodeVoice(samples, rate, name);
+  } catch (err) {
+    console.warn("[motion] voiceover encode", err);
+  }
+  file ??= new File([encodeWav([samples], rate)], `${name}.wav`, {
     type: "audio/wav",
   });
   await importFiles([file], { at: s.at });

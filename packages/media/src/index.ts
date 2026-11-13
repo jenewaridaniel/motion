@@ -7,3 +7,4 @@ export * from "./sfx.ts";
 export * from "./shapes.ts";
 export * from "./text.ts";
 export * from "./visuals.ts";
+export * from "./voice.ts";
