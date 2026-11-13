@@ -205,11 +205,19 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** Safari, Firefox; fonts that don't cover a language's letters (they fall back to a standard font); very large font files; caption files with thousands of cues; dragging on touch screens.
 - Not built: changing the style of all captions at once, resize/rotate handles on the preview, editing caption timing in bulk.
 
+### Phase 2, step 2: thumbnails and waveforms (2026-11-13)
+
+- Built: video clips show thumbnails along their length; photos repeat; clips with sound show a waveform (full height for audio, a strip under video). Both follow trims, splits, speed and zoom; the waveform also follows volume. Drawn in 1024 px tiles, only while visible. Peaks are read in one pass without holding the audio (`core.PeakBuilder`); thumbnails come from `media.Thumbnails` (batched, newest first, 1,500 cached).
+- Tested by hand in Chrome (test copy on port 5181): thumbnails, photo and waveforms on import; only 7 of 24 tiles drawn when zoomed far in; first thumbnail matches the true frame after a 3 s trim at zoom 20 to 400 (hue-coded test video, pixels read from the tile); 2x speed shows the end of the source; beat test clip shows 10 beeps in 5 s, flat at volume 0, same 10 beeps in half the width at 2x; 10-minute MP3 waveform in 1 s (234 KB, one 58 ms pause); everything redraws after reload.
+- Bug found and fixed: thumbnails were rounded to a grid as coarse as the slot spacing, so the first thumbnail of a trimmed clip could be up to a second off. Grid is now a quarter slot.
+- **Not tested:** real camera footage, very long videos (only short ones), Safari and Firefox.
+- Waveforms and thumbnails are kept in memory only, so they're worked out again after a reload (1 s for 10 minutes of audio).
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
 1. ~~Text layers.~~ Done.
-2. Thumbnails and waveforms on clips.
+2. ~~Thumbnails and waveforms on clips.~~ Done.
 3. Phone layout and touch timeline (the editor shows a "coming next" notice on phones). Re-measure export smoothness there.
 4. A project list ("New project", open older projects), project file import/export.
 Then Phase 3 (transitions, filters and color, effects, audio tools, stickers, templates) and Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).

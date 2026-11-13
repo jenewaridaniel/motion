@@ -14,6 +14,7 @@ import {
   layerEnd,
   type MediaLayer,
   type Project,
+  sourceTimeAt,
   type TextStyle,
 } from "./model.ts";
 import { type Property, valueAt } from "./property.ts";
@@ -110,7 +111,7 @@ function drawComposition(
         drawComposition(
           p,
           layer.compositionId,
-          layer.inPoint + Math.round(local * layer.speed),
+          sourceTimeAt(layer, local),
           matrix,
           opacity,
           `${key}/`,
@@ -160,7 +161,7 @@ function drawComposition(
               kind: "video",
               assetId: asset.id,
               time: Math.min(
-                layer.inPoint + Math.round(local * layer.speed),
+                sourceTimeAt(layer, local),
                 Math.max(0, asset.duration - 1),
               ),
               width,

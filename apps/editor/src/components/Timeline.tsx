@@ -30,6 +30,7 @@ import { engine } from "../lib/engine.ts";
 import { DEFAULT_FONT } from "../lib/fonts.ts";
 import { ACCEPT, importFiles } from "../state/media.ts";
 import { useEditor } from "../state/store.ts";
+import { ClipVisuals } from "./ClipVisuals.tsx";
 import {
   EyeIcon,
   ImageIcon,
@@ -713,16 +714,31 @@ function Clip({
         }
       }}
     >
-      <div className="pointer-events-none flex h-full items-start gap-1.5 px-2.5 pt-1.5 text-[11px] text-ink">
-        <Icon width={12} height={12} className="mt-px shrink-0 opacity-80" />
-        <span className="truncate font-medium">{layer.name}</span>
+      {layer.kind === "media" && asset && (
+        <ClipVisuals
+          layer={layer}
+          asset={asset}
+          width={w}
+          height={trackHeight(track) - 8}
+          pxPerSec={pps}
+        />
+      )}
+      <div className="pointer-events-none relative flex h-full items-start gap-1.5 px-2.5 pt-1.5 text-[11px] text-ink">
+        <Icon
+          width={12}
+          height={12}
+          className="mt-px shrink-0 opacity-80 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]"
+        />
+        <span className="truncate font-medium [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
+          {layer.name}
+        </span>
         {speed && (
           <span className="tabular shrink-0 rounded bg-black/25 px-1 text-[10px]">
             {speed}
           </span>
         )}
       </div>
-      <span className="tabular pointer-events-none absolute bottom-1 left-2.5 text-[10px] text-ink/70">
+      <span className="tabular pointer-events-none absolute bottom-1 left-2.5 text-[10px] text-ink/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
         {formatSeconds(layer.duration)}
       </span>
       {keyframeTimes.map((t) => (

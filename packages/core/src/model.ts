@@ -152,6 +152,10 @@ export type SourceLayer = MediaLayer | CompositionLayer;
 export const hasSource = (l: Layer): l is SourceLayer =>
   l.kind === "media" || l.kind === "composition";
 
+/** Source time shown at `local` time into a layer (after in-point and speed). */
+export const sourceTimeAt = (l: SourceLayer, local: Micros): Micros =>
+  l.inPoint + Math.round(local * l.speed);
+
 // ---------------------------------------------------------------- tracks
 
 export interface Track {
