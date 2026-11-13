@@ -1,6 +1,8 @@
 import {
   collectAudioSegments,
+  type ExportQualityLevel,
   evaluateFrame,
+  exportRateControl,
   frameTime,
   type Micros,
   type Project,
@@ -18,9 +20,7 @@ import {
   getFirstEncodableAudioCodec,
   Mp4OutputFormat,
   Output,
-  QUALITY_HIGH,
-  QUALITY_MEDIUM,
-  QUALITY_VERY_HIGH,
+  Quality,
   StreamTarget,
   type StreamTargetChunk,
   type VideoCodec,
@@ -30,13 +30,23 @@ import { FrameProvider } from "./frames.ts";
 import type { MediaHandle } from "./probe.ts";
 
 export type ExportCodec = Extract<VideoCodec, "avc" | "hevc">;
-export type ExportQuality = "standard" | "high" | "max";
+export type ExportQuality = ExportQualityLevel;
 
-const QUALITY = {
-  standard: QUALITY_MEDIUM,
-  high: QUALITY_HIGH,
-  max: QUALITY_VERY_HIGH,
-} as const;
+/**
+ * Encoder quality for these settings: constant quality where the encoder
+ * supports it, otherwise a bitrate that scales with size and frame rate.
+ * See core's exportRateControl for the numbers and why.
+ */
+export function exportQuality(settings: ExportSettings): Quality {
+  const { quantizer, bitrate } = exportRateControl(
+    settings.codec,
+    settings.width,
+    settings.height,
+    settings.fps,
+    settings.quality,
+  );
+  return new Quality({ quantizer, bitrate });
+}
 
 export interface ExportSettings {
   width: number;
@@ -142,7 +152,7 @@ export async function exportProject(
 
   const videoSource = new CanvasSource(canvas, {
     codec: settings.codec,
-    bitrate: QUALITY[settings.quality],
+    quality: exportQuality(settings),
     keyFrameInterval: 2,
     latencyMode: "quality",
   });
