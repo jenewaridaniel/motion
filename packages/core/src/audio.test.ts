@@ -3,12 +3,14 @@ import {
   addAsset,
   appendAsset,
   extractAudio,
+  moveLayer,
   setAudioFade,
   setPropertyValue,
   setTransition,
   setTransitionDuration,
   splitLayer,
   toggleKeyframe,
+  trimLayer,
 } from "./edit.ts";
 import {
   audioGainAt,
@@ -221,6 +223,48 @@ describe("extract audio", () => {
     const back = h.undo(p);
     expect(layers(back).length).toBe(2);
     expect(layers(back).find((l) => l.id === v)!.volume.value).toBe(1);
+  });
+
+  it("keeps a transition's crossfade while it stays in step with its video", () => {
+    const h = new History();
+    let p = h.apply(createProject(), (d) => {
+      addAsset(d, video("a"));
+      addAsset(d, video("b"));
+      appendAsset(d, "a");
+      appendAsset(d, "b");
+    });
+    const [a, b] = layers(p).map((l) => l.id) as [string, string];
+    p = h.apply(p, (d) => {
+      trimLayer(d, a, "end", sec(8));
+      setTransition(d, b, "dissolve");
+      setTransitionDuration(d, b, sec(1));
+    });
+    const before = { a: seg(p, a), b: seg(p, b) };
+    let ea: string | null = null;
+    let eb: string | null = null;
+    p = h.apply(p, (d) => {
+      ea = extractAudio(d, a);
+      eb = extractAudio(d, b);
+    });
+    // Same crossfade as before, now on the audio clips.
+    const strip = (s: ReturnType<typeof seg>) => ({
+      start: s.start,
+      duration: s.duration,
+      sourceIn: s.sourceIn,
+      fadeIn: s.fadeIn,
+      fadeOut: s.fadeOut,
+    });
+    expect(strip(seg(p, ea!))).toEqual(strip(before.a));
+    expect(strip(seg(p, eb!))).toEqual(strip(before.b));
+    // Moved on its own, it's independent: no crossfade any more.
+    p = h.apply(p, (d) => {
+      const track = rootComposition(d).tracks.find((t) =>
+        t.layers.some((l) => l.id === eb),
+      )!;
+      moveLayer(d, eb!, track.id, sec(12));
+    });
+    expect(seg(p, eb!).fadeIn).toBeNull();
+    expect(seg(p, eb!).start).toBe(sec(12));
   });
 
   it("keeps volume keyframes in step", () => {

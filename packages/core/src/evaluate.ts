@@ -387,6 +387,34 @@ export function collectAudioSegments(
   const comp = p.compositions[compId];
   if (!comp) return [];
   const out: AudioSegment[] = [];
+  /**
+   * The clip's neighbours on the main track, for transitions. Extracted
+   * sound uses its video clip's place while their timing still matches
+   * (moved or trimmed on its own, it's independent).
+   */
+  const mainPlace = (layer: MediaLayer, track: Track, i: number) => {
+    if (track.magnetic) {
+      return { prev: track.layers[i - 1], next: track.layers[i + 1] };
+    }
+    if (!layer.linkedTo) return {};
+    for (const t of comp.tracks) {
+      if (!t.magnetic) continue;
+      const j = t.layers.findIndex((l) => l.id === layer.linkedTo);
+      const v = t.layers[j];
+      if (
+        v?.kind === "media" &&
+        v.start === layer.start &&
+        v.duration === layer.duration &&
+        v.inPoint === layer.inPoint &&
+        v.speed === layer.speed &&
+        v.assetId === layer.assetId
+      ) {
+        // The transition into this clip lives on the video clip.
+        return { prev: t.layers[j - 1], next: t.layers[j + 1], self: v };
+      }
+    }
+    return {};
+  };
   for (const track of comp.tracks) {
     if (track.muted) continue;
     track.layers.forEach((layer, i) => {
@@ -399,11 +427,12 @@ export function collectAudioSegments(
       let sourceIn = layer.inPoint;
       let fadeIn: AudioFade | null = null;
       let fadeOut: AudioFade | null = null;
-      const prev = track.magnetic ? track.layers[i - 1] : undefined;
-      const next = track.magnetic ? track.layers[i + 1] : undefined;
-      if (prev && layer.transition) {
+      const place = mainPlace(layer, track, i);
+      const { prev, next } = place;
+      const transitionIn = (place.self ?? layer).transition;
+      if (prev && transitionIn) {
         const half = Math.floor(
-          transitionLength(layer.transition, prev, layer) / 2,
+          transitionLength(transitionIn, prev, layer) / 2,
         );
         if (half > 0) {
           // Start early by up to half the transition, if the file has sound there.

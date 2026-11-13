@@ -664,6 +664,7 @@ export function extractAudio(p: Project, layerId: Id): Id | null {
   audio.speed = layer.speed;
   audio.volume = structuredClone(volume);
   if (layer.fade) audio.fade = { ...layer.fade };
+  audio.linkedTo = layer.id;
   let track = comp.tracks.find(
     (t) => t.kind === "audio" && fits(t, audio.start, audio.duration),
   );

@@ -236,6 +236,9 @@ function checkLayer(l: unknown, p: Obj): string | null {
     ) {
       return `${where} has an invalid sound fade`;
     }
+    if (l.linkedTo !== undefined && !isStr(l.linkedTo)) {
+      return `${where} has an invalid link`;
+    }
     return null;
   }
   if (l.kind === "composition") {

@@ -78,6 +78,11 @@ export interface MediaLayer extends LayerBase {
   volume: Property<number>;
   /** Sound fades at the clip's start and end (their lengths). */
   fade?: { in: Micros; out: Micros };
+  /**
+   * For sound taken out of a video clip ("extract audio"): that clip. While
+   * both keep the same timing, the sound follows the video's transitions.
+   */
+  linkedTo?: Id;
 }
 
 /** A nested composition, used for grouping and motion design. */
