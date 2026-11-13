@@ -33,6 +33,7 @@ import { EffectsInspector } from "./EffectsInspector.tsx";
 import { Diamond } from "./icons.tsx";
 import { LutControl } from "./LutControl.tsx";
 import { NumberField } from "./NumberField.tsx";
+import { ShapeInspector } from "./ShapeInspector.tsx";
 import { TextInspector } from "./TextInspector.tsx";
 import { TransitionControl } from "./TransitionControl.tsx";
 
@@ -227,16 +228,19 @@ function LayerInspector({ layer }: { layer: Layer }) {
         <p className="mt-0.5 text-ink-faint">
           {layer.kind === "text"
             ? "Text"
-            : asset?.kind === "image"
-              ? "Photo"
-              : asset?.kind === "audio"
-                ? "Audio"
-                : "Video"}
+            : layer.kind === "shape"
+              ? "Shape"
+              : asset?.kind === "image"
+                ? "Photo"
+                : asset?.kind === "audio"
+                  ? "Audio"
+                  : "Video"}
           {!inRange && " · playhead is outside this clip"}
         </p>
       </div>
 
       {layer.kind === "text" && <TextInspector layer={layer} />}
+      {layer.kind === "shape" && <ShapeInspector layer={layer} />}
 
       {visual && (
         <Section title="Transform">

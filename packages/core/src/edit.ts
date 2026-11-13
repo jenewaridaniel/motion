@@ -18,6 +18,7 @@ import {
   type Composition,
   containScale,
   createMediaLayer,
+  createShapeLayer,
   createTextLayer,
   createTrack,
   type FontAsset,
@@ -32,6 +33,7 @@ import {
   newId,
   type Project,
   rootComposition,
+  type ShapeLayer,
   type TextAnimation,
   type TextLayer,
   type TextStyle,
@@ -49,6 +51,7 @@ import {
   type Vec2,
   valueAt,
 } from "./property.ts";
+import type { ShapeKind, ShapePreset, ShapeStyle } from "./shapes.ts";
 import { frameTime, type Micros } from "./time.ts";
 import {
   DEFAULT_TRANSITION,
@@ -243,6 +246,97 @@ export function addText(
   track.layers.push(layer);
   sortTrack(track);
   return layer.id;
+}
+
+// ---------------------------------------------------------------- shapes
+
+/**
+ * Add a shape or sticker at `at`, in the middle of the canvas. It goes on a
+ * graphics track under any text tracks, so captions stay on top.
+ */
+export function addShape(p: Project, preset: ShapePreset, at: Micros): Id {
+  const comp = rootComposition(p);
+  const short = Math.min(comp.width, comp.height);
+  const layer = createShapeLayer(
+    comp,
+    Math.max(0, Math.round(at)),
+    preset.shape,
+    [
+      Math.max(1, Math.round(preset.size[0] * short)),
+      Math.max(1, Math.round(preset.size[1] * short)),
+    ],
+    structuredClone(preset.style),
+    preset.name,
+  );
+  const isGraphics = (t: Track) =>
+    t.kind === "visual" &&
+    !t.magnetic &&
+    t.layers.length > 0 &&
+    t.layers.every((l) => l.kind === "shape");
+  let track = comp.tracks.find(
+    (t) => isGraphics(t) && fits(t, layer.start, layer.duration),
+  );
+  if (!track) {
+    track = createTrack("visual", { name: "Graphics" });
+    const textOnTop = comp.tracks.findIndex(
+      (t) =>
+        !(
+          t.kind === "visual" &&
+          !t.magnetic &&
+          t.layers.length > 0 &&
+          t.layers.every((l) => l.kind === "text")
+        ),
+    );
+    comp.tracks.splice(
+      textOnTop < 0 ? comp.tracks.length : textOnTop,
+      0,
+      track,
+    );
+  }
+  track.layers.push(layer);
+  sortTrack(track);
+  return layer.id;
+}
+
+function findShape(p: Project, layerId: Id): ShapeLayer | null {
+  const layer = findLayer(p, layerId)?.layer;
+  return layer?.kind === "shape" ? layer : null;
+}
+
+export function setShapeStyle(
+  p: Project,
+  layerId: Id,
+  style: Partial<ShapeStyle>,
+): boolean {
+  const layer = findShape(p, layerId);
+  if (!layer) return false;
+  layer.style = { ...layer.style, ...style };
+  if (layer.style.stroke) {
+    layer.style.stroke.width = Math.max(0, layer.style.stroke.width);
+  }
+  layer.style.radius = Math.max(0, layer.style.radius);
+  return true;
+}
+
+export function setShapeSize(p: Project, layerId: Id, size: Vec2): boolean {
+  const layer = findShape(p, layerId);
+  if (!layer) return false;
+  layer.size = [
+    Math.max(1, Math.round(size[0])),
+    Math.max(1, Math.round(size[1])),
+  ];
+  return true;
+}
+
+export function setShapeKind(
+  p: Project,
+  layerId: Id,
+  shape: ShapeKind,
+): boolean {
+  const layer = findShape(p, layerId);
+  if (!layer) return false;
+  layer.shape = shape;
+  return true;
 }
 
 function findText(p: Project, layerId: Id): TextLayer | null {
@@ -861,7 +955,7 @@ export function setAspect(p: Project, aspect: AspectKey): void {
   comp.height = height;
   for (const track of comp.tracks) {
     for (const layer of track.layers) {
-      if (layer.kind === "text") {
+      if (layer.kind === "text" || layer.kind === "shape") {
         // Same fraction of the canvas, so a caption near the bottom stays there.
         const pos = layer.transform.position;
         const move = ([x, y]: Vec2): Vec2 => [x * sx, y * sy];

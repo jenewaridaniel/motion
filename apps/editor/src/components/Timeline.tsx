@@ -51,6 +51,7 @@ import {
   MusicIcon,
   PlusIcon,
   RedoIcon,
+  ShapesIcon,
   SpeakerIcon,
   SplitIcon,
   TextIcon,
@@ -616,8 +617,8 @@ function TrackRow({
             <EyeIcon off={track.hidden} width={14} height={14} />
           </button>
         )}
-        {/* Text has no sound, so a track of only text gets no mute button. */}
-        {!track.layers.every((l) => l.kind === "text") && (
+        {/* Only tracks with media clips have sound to mute. */}
+        {track.layers.some((l) => l.kind === "media") && (
           <button
             type="button"
             title={track.muted ? "Unmute track" : "Mute track"}
@@ -989,11 +990,13 @@ function Clip({
   const Icon =
     layer.kind === "text"
       ? TextIcon
-      : asset?.kind === "image"
-        ? ImageIcon
-        : asset?.kind === "audio"
-          ? MusicIcon
-          : VideoIcon;
+      : layer.kind === "shape"
+        ? ShapesIcon
+        : asset?.kind === "image"
+          ? ImageIcon
+          : asset?.kind === "audio"
+            ? MusicIcon
+            : VideoIcon;
   const speed =
     layer.kind === "media" && layer.speed !== 1
       ? `${+layer.speed.toFixed(2)}×`

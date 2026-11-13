@@ -21,7 +21,8 @@ import {
   type TextStyle,
   type Track,
 } from "./model.ts";
-import { type Property, valueAt } from "./property.ts";
+import { type Property, type Vec2, valueAt } from "./property.ts";
+import type { ShapeKind, ShapeStyle } from "./shapes.ts";
 import { textAnimationAt } from "./text-animation.ts";
 import type { Micros } from "./time.ts";
 import {
@@ -38,7 +39,9 @@ export type DrawSource =
    * Laid out by whoever draws it; layer space is centred on the text block.
    * `reveal` (0 to 1) shows only that share of the letters, in reading order.
    */
-  | { kind: "text"; text: string; style: TextStyle; reveal?: number };
+  | { kind: "text"; text: string; style: TextStyle; reveal?: number }
+  /** Centred on the layer's origin, `size` in layer pixels. */
+  | { kind: "shape"; shape: ShapeKind; size: Vec2; style: ShapeStyle };
 
 /** One thing to draw. Everything the renderer needs, nothing it has to look up. */
 export interface VisualDraw {
@@ -287,6 +290,22 @@ function drawLayer(
       },
       matrix: multiply(matrix, extra),
       opacity: shown,
+      style: style(),
+    });
+    return;
+  }
+  if (layer.kind === "shape") {
+    out.push({
+      key,
+      layerId: layer.id,
+      source: {
+        kind: "shape",
+        shape: layer.shape,
+        size: layer.size,
+        style: layer.style,
+      },
+      matrix,
+      opacity,
       style: style(),
     });
     return;

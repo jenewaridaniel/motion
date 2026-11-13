@@ -52,7 +52,9 @@ function setup(...assets: Asset[]) {
 const videoTime = (d: VisualDraw) =>
   d.source.kind === "video" ? d.source.time : null;
 const assetOf = (d: VisualDraw) =>
-  d.source.kind === "text" ? null : d.source.assetId;
+  d.source.kind === "text" || d.source.kind === "shape"
+    ? null
+    : d.source.assetId;
 
 const main = (p: Project) => rootComposition(p).tracks.find((t) => t.magnetic)!;
 const layers = (p: Project) => main(p).layers;

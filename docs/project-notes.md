@@ -281,6 +281,15 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** a real microphone (the browser's permission prompt can't be answered from here, so the mic was replaced by a tone; everything after the mic is the real code); how the sound effects actually sound (checked by measurement, not by ear); the phone-size Voice button; Safari and Firefox recording.
 - Known limits: an extracted clip doesn't keep a transition's crossfade (it cuts at the clip's edges); recording has a small delay (tens of milliseconds) between the mic and the timeline; long voiceovers are big (WAV, about 5.7 MB a minute).
 
+### Phase 3, stage F: shapes and stickers (2026-11-13)
+
+- Built: a new **shape** layer. The Media panel now has tabs (Media / Sounds / Shapes). Shapes: rectangle, circle, triangle, star, arrow, line, outline circle, label bar. Stickers (drawn in code, no licensed art or emoji fonts): heart, gold star, sparkle, burst, speech bubble, tick, cross, pointer, in bold colours with a white outline. Click to add at the playhead in the middle of the canvas, on a "Graphics" track under any text. The clip's Shape settings change the shape (12 kinds), width and height, corner rounding, fill (or none), outline colour and thickness (or none). Everything else works on shapes too: move on the canvas, keyframes, colour, effects, masks, blend modes.
+- How it works: `core/shapes.ts` gives every shape as path commands (tested: closed, inside its box). The renderer draws them with Canvas 2D at the size they appear (cached, like text), and the panel thumbnails are SVG from the same commands.
+- Tested by hand (port 5181): the Shapes tab shows every shape and sticker; added a Heart (selected, on a Graphics track between the text tracks and the main track, starts at the playhead); pixel check of the rendered frame: the middle is exactly the heart's colour and the edge is the white outline; in the settings changed it to a star, turned the outline off, typed a width of 500, picked a blue fill; dragged it on the canvas in 12 small moves (moved exactly 240 by 120 canvas pixels, one undo step); reload keeps it; exported video shows the star's colour within 1 level at its new place.
+- Bug found and fixed: the Import button was cut off once the panel had tabs (now it only shows on the Media tab).
+- **Not tested:** every one of the 12 shape kinds on the canvas (all are covered by core tests and the panel thumbnails, but only heart and star were checked as rendered pixels); shapes in phone layout; very large shapes (capped at 4096 pixels per side, like text).
+- Known limits: no gradient fills; stickers have no built-in animations (use keyframes).
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
@@ -288,7 +297,7 @@ Agreed order (Phase 2 next):
 2. ~~Thumbnails and waveforms on clips.~~ Done.
 3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
 4. ~~A project list~~ Done. **Phase 2 is complete** (only the real-phone test is left, and needs the user).
-Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. ~~E. audio tools~~ done. Next: F. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
+Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. ~~E. audio tools~~ done. ~~F. shapes and stickers~~ done. Next: G. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
 Then Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

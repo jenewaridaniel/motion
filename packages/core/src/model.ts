@@ -2,6 +2,7 @@ import type { Effects, Mask } from "./effects.ts";
 import type { Adjustments, BlendMode } from "./look.ts";
 import type { LayerLut, LutAsset } from "./lut.ts";
 import { type Property, prop, type Vec2 } from "./property.ts";
+import type { ShapeKind, ShapeStyle } from "./shapes.ts";
 import { type Micros, sec } from "./time.ts";
 import type { Transition } from "./transitions.ts";
 
@@ -160,7 +161,19 @@ export interface TextLayer extends LayerBase {
   animation?: TextAnimation;
 }
 
-export type Layer = MediaLayer | CompositionLayer | TextLayer;
+/**
+ * A vector shape or sticker. Like text, its layer space is centred on the
+ * shape, so the default anchor (0, 0) turns and scales it around its middle.
+ */
+export interface ShapeLayer extends LayerBase {
+  kind: "shape";
+  shape: ShapeKind;
+  /** Width and height in layer pixels (before the layer's scale). */
+  size: Vec2;
+  style: ShapeStyle;
+}
+
+export type Layer = MediaLayer | CompositionLayer | TextLayer | ShapeLayer;
 
 /** Layers that play part of a source (a file or a nested composition). */
 export type SourceLayer = MediaLayer | CompositionLayer;
@@ -354,6 +367,33 @@ export function createTextLayer(
   };
 }
 
+export function createShapeLayer(
+  comp: Pick<Composition, "width" | "height">,
+  start: Micros,
+  shape: ShapeKind,
+  size: Vec2,
+  style: ShapeStyle,
+  name: string,
+): ShapeLayer {
+  return {
+    id: newId(),
+    kind: "shape",
+    name,
+    start,
+    duration: DEFAULT_TEXT_DURATION,
+    transform: {
+      anchor: prop<Vec2>([0, 0]),
+      position: prop<Vec2>([comp.width / 2, comp.height / 2]),
+      scale: prop<Vec2>([1, 1]),
+      rotation: prop(0),
+    },
+    opacity: prop(1),
+    shape,
+    size,
+    style,
+  };
+}
+
 export function createMediaLayer(
   asset: Asset,
   comp: Pick<Composition, "width" | "height">,
@@ -423,7 +463,9 @@ export function findTrack(
 
 /** Longest the layer can last given its source and speed. */
 export function maxLayerDuration(p: Project, layer: Layer): Micros {
-  if (layer.kind === "text") return Number.POSITIVE_INFINITY;
+  if (layer.kind === "text" || layer.kind === "shape") {
+    return Number.POSITIVE_INFINITY;
+  }
   if (layer.kind === "media") {
     const asset = p.assets[layer.assetId];
     if (!asset || asset.kind === "image") return Number.POSITIVE_INFINITY;

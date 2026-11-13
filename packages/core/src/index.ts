@@ -13,6 +13,7 @@ export * from "./model.ts";
 export * from "./projects.ts";
 export * from "./property.ts";
 export * from "./serialize.ts";
+export * from "./shapes.ts";
 export * from "./text-animation.ts";
 export * from "./time.ts";
 export * from "./transitions.ts";

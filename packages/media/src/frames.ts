@@ -6,6 +6,7 @@ import {
   type WrappedCanvas,
 } from "mediabunny";
 import type { MediaHandle } from "./probe.ts";
+import { ShapeRasterizer } from "./shapes.ts";
 import { TextRasterizer } from "./text.ts";
 
 /**
@@ -90,6 +91,7 @@ export class FrameProvider {
   /** Last good frame per key, shown while a new frame is still decoding. */
   private last = new Map<string, PlacedImage>();
   private text = new TextRasterizer();
+  private shapes = new ShapeRasterizer();
 
   constructor(
     private readonly handle: (assetId: string) => MediaHandle | undefined,
@@ -119,6 +121,16 @@ export class FrameProvider {
     await Promise.all(
       draws.map(async (d) => {
         const src = d.source;
+        if (src.kind === "shape") {
+          const img = this.shapes.render(
+            src.shape,
+            src.size,
+            src.style,
+            layerToOutputScale(d, outputScale),
+          );
+          if (img) out.set(d.key, img);
+          return;
+        }
         if (src.kind === "text") {
           const img = await this.text.render(
             src.text,

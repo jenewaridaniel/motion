@@ -13,6 +13,7 @@ import {
   TEXT_LOOP_ANIMATIONS,
   TEXT_OUT_ANIMATIONS,
 } from "./model.ts";
+import { SHAPE_KINDS } from "./shapes.ts";
 import { TRANSITION_KINDS } from "./transitions.ts";
 
 /** The project format this build reads and writes. */
@@ -191,6 +192,23 @@ function checkLayer(l: unknown, p: Obj): string | null {
         return `${where} has an invalid adjustment (${k})`;
       }
     }
+  }
+  if (l.kind === "shape") {
+    const st = l.style;
+    const strokeOk = (v: unknown) =>
+      v === null ||
+      (isObj(v) && isColor(v.color) && isNum(v.width) && v.width >= 0);
+    if (
+      !SHAPE_KINDS.includes(l.shape as never) ||
+      !isVec2(l.size) ||
+      !isObj(st) ||
+      !(st.fill === null || isColor(st.fill)) ||
+      !strokeOk(st.stroke) ||
+      !isNum(st.radius)
+    ) {
+      return `${where} is an invalid shape`;
+    }
+    return null;
   }
   if (l.kind === "text") {
     if (!isStr(l.text)) return `${where} has no text`;

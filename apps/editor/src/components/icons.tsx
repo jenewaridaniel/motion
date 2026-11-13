@@ -126,6 +126,12 @@ export const MicIcon = (p: P) => (
     <path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2" />
   </Svg>
 );
+export const ShapesIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="1.75" y="7.25" width="7" height="7" rx="1" />
+    <circle cx="11" cy="5" r="3.25" />
+  </Svg>
+);
 export const TextIcon = (p: P) => (
   <Svg {...p}>
     <path d="M3 4V2.5h10V4M8 2.5v11M6 13.5h4" />

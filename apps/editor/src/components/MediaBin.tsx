@@ -1,6 +1,6 @@
 import { addOverlay, appendAsset, formatSeconds } from "@motion/core";
 import { SOUND_EFFECTS } from "@motion/media";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { ACCEPT, hasMedia, importFiles } from "../state/media.ts";
 import { addSoundEffect, previewSoundEffect } from "../state/sounds.ts";
 import { useEditor } from "../state/store.ts";
@@ -12,6 +12,7 @@ import {
   PlusIcon,
   VideoIcon,
 } from "./icons.tsx";
+import { ShapesPanel } from "./ShapesPanel.tsx";
 
 export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
   const assets = useEditor((s) => s.project.assets);
@@ -21,6 +22,7 @@ export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
   const edit = useEditor((s) => s.edit);
   const input = useRef<HTMLInputElement>(null);
   const list = Object.values(assets);
+  const [tab, setTab] = useState<"media" | "sounds" | "shapes">("media");
 
   return (
     <aside
@@ -31,12 +33,31 @@ export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
           : "flex w-64 shrink-0 flex-col border-line border-r bg-panel"
       }
     >
-      <div className="flex items-center justify-between border-line-soft border-b px-4 py-3">
-        <h2 className="font-semibold text-ink">Media</h2>
+      <div className="flex items-center justify-between gap-2 border-line-soft border-b px-3 py-2.5">
+        <div role="tablist" aria-label="Add" className="flex gap-0.5">
+          {(
+            [
+              ["media", "Media"],
+              ["sounds", "Sounds"],
+              ["shapes", "Shapes"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={`h-7 rounded-md px-2 font-semibold text-[12px] transition-colors ${tab === id ? "bg-raised text-ink" : "text-ink-faint hover:text-ink"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="flex h-7 items-center gap-1.5 rounded-full bg-wine px-3 font-semibold text-[12px] text-ink transition-colors hover:bg-wine-hi"
+          className={`flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-wine px-3 font-semibold text-[12px] text-ink transition-colors hover:bg-wine-hi ${tab === "media" ? "" : "hidden"}`}
         >
           <PlusIcon width={13} height={13} />
           Import
@@ -55,7 +76,11 @@ export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
       </div>
 
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-        <ul className="flex flex-col gap-0.5 p-2">
+        {tab === "sounds" && <SoundEffects />}
+        {tab === "shapes" && <ShapesPanel />}
+        <ul
+          className={`flex flex-col gap-0.5 p-2 ${tab === "media" ? "" : "hidden"}`}
+        >
           {list.map((a) => {
             const Icon =
               a.kind === "image"
@@ -129,7 +154,6 @@ export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
             </li>
           )}
         </ul>
-        <SoundEffects />
       </div>
     </aside>
   );
@@ -138,10 +162,7 @@ export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
 /** Built-in sound effects: listen, then add at the playhead. */
 function SoundEffects() {
   return (
-    <section
-      aria-label="Sound effects"
-      className="border-line-soft border-t p-2"
-    >
+    <section aria-label="Sound effects" className="p-2">
       <h3 className="px-2 pt-1 pb-1.5 font-semibold text-[11px] text-ink-soft">
         Sound effects
       </h3>

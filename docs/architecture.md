@@ -45,7 +45,7 @@ Layer       { start, duration, parentId?, transform, opacity, ...kind }
 - **Nesting**: a `composition` layer draws another composition through its own transform. Nested content is not clipped to the nested canvas yet (that needs render-to-texture, see below).
 - **Magnetic track**: the main track has no gaps. Its clips are packed back to back after every edit (ripple). Overlay and audio tracks are free and don't allow overlaps.
 
-Planned layer kinds, which slot into the same union: `shape` (paths, strokes, trim paths), `solid`, `adjustment`.
+Planned layer kinds, which slot into the same union: `solid`, `adjustment`. (`shape` exists: see Shapes below.)
 
 ## Text
 
@@ -54,6 +54,10 @@ Planned layer kinds, which slot into the same union: `shape` (paths, strokes, tr
 - **Animations:** `TextLayer.animation` (in / out / loop presets). `core.textAnimationAt` turns them into opacity, scale, offset, rotation and a letter `reveal` at draw time; `evaluateFrame` applies them around the anchor, on top of keyframes. Split keeps "in" on the left and "out" on the right.
 - **Captions:** `core.parseCaptions` (SRT, WebVTT) and `core.addCaptions` (text clips near the bottom, overlaps on extra tracks).
 - **Fonts:** 36 bundled fonts (OFL or Apache 2.0), listed in `apps/editor/src/lib/fonts.generated.ts`, which `scripts/gen-fonts.mjs` builds from the font packages. Each downloads only when used. Users' own fonts are `Project.fonts` entries; the file is stored in the `media` store by font id and registered with `FontFace` on load. Core's default is generic `sans-serif`; the editor passes its default (Archivo).
+
+## Shapes
+
+`ShapeLayer` (`kind: "shape"`) has a `shape` kind, a `size` in layer pixels and a `ShapeStyle` (fill, outline, corner radius). Like text, its layer space is centred on the shape. `core.shapePath` returns the outline as path commands; `media.ShapeRasterizer` draws them with Canvas 2D at output resolution (cached) and the editor turns them into SVG for thumbnails. Presets (`SHAPES`, `STICKERS`) give a size as a share of the canvas' short side.
 
 ## Working on the canvas
 
