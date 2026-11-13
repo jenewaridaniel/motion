@@ -5,6 +5,7 @@
  * media; some are made to go over the user's own video.
  */
 import {
+  addPlaceholder,
   addShape,
   addText,
   setAspect,
@@ -57,10 +58,24 @@ interface ShapeSpec {
   style: ShapeStyle;
 }
 
+interface SlotSpec {
+  /** What goes there, e.g. "Your video". */
+  label: string;
+  from: number;
+  to: number;
+  /** On the main track (a full-length background clip). */
+  main?: boolean;
+  /** Centre and size as fractions of the canvas width and height. */
+  at?: Vec2;
+  size?: Vec2;
+}
+
 /** What a template's `build` gets: add text and shapes in canvas fractions. */
 export interface Builder {
   text(spec: TextSpec): void;
   shape(spec: ShapeSpec): void;
+  /** A slot for the user's own video or photo. */
+  slot(spec: SlotSpec): void;
   background(color: string): void;
 }
 
@@ -94,6 +109,7 @@ export const TEMPLATES: Template[] = [
     fonts: [FONT.display, FONT.sans],
     build(b) {
       b.background("#111014");
+      b.slot({ label: "Your video (optional)", from: 0, to: 4, main: true });
       b.shape({
         name: "Accent bar",
         shape: "rect",
@@ -215,6 +231,7 @@ export const TEMPLATES: Template[] = [
     previewAt: 2,
     fonts: [FONT.sans],
     build(b) {
+      b.slot({ label: "Your video", from: 0, to: 6, main: true });
       b.shape({
         name: "Label",
         shape: "rect",
@@ -260,6 +277,7 @@ export const TEMPLATES: Template[] = [
     fonts: [FONT.display, FONT.sans],
     build(b) {
       b.background("#1a1033");
+      b.slot({ label: "Your video or photo", from: 0, to: 5, main: true });
       b.shape({
         name: "Gold star",
         shape: "star",
@@ -316,11 +334,18 @@ export const TEMPLATES: Template[] = [
     fonts: [FONT.round, FONT.sans],
     build(b) {
       b.background("#0e1726");
+      b.slot({
+        label: "Your product photo",
+        from: 0,
+        to: 3,
+        at: [0.5, 0.33],
+        size: [0.8, 0.34],
+      });
       b.text({
         text: "Meet the new\nTHING",
         from: 0,
         to: 3,
-        at: [0.5, 0.45],
+        at: [0.5, 0.68],
         style: { font: FONT.round, size: 120, color: "#ffffff", weight: 800 },
         anim: { ...pop(0.4), out: { kind: "fade", duration: sec(0.3) } },
       });
@@ -395,6 +420,15 @@ export function projectFromTemplate(id: string): Project | null {
         position: where(s.at),
       });
       if (id && s.anim) setTextAnimation(p, id, s.anim);
+    },
+    slot(s) {
+      addPlaceholder(p, sec(s.from), {
+        label: s.label,
+        duration: sec(s.to - s.from),
+        main: s.main,
+        position: s.at && where(s.at),
+        size: s.size && [s.size[0] * comp.width, s.size[1] * comp.height],
+      });
     },
     shape(s) {
       const preset: ShapePreset = {

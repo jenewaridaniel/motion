@@ -27,6 +27,7 @@ import {
   valueAt,
 } from "@motion/core";
 import type { ReactNode } from "react";
+import { pickForPlaceholder } from "../state/placeholders.ts";
 import { useEditor, useSelectedLayer } from "../state/store.ts";
 import { AudioControls } from "./AudioControls.tsx";
 import { EffectsInspector } from "./EffectsInspector.tsx";
@@ -230,17 +231,34 @@ function LayerInspector({ layer }: { layer: Layer }) {
             ? "Text"
             : layer.kind === "shape"
               ? "Shape"
-              : asset?.kind === "image"
-                ? "Photo"
-                : asset?.kind === "audio"
-                  ? "Audio"
-                  : "Video"}
+              : layer.kind === "placeholder"
+                ? "Placeholder for your video or photo"
+                : asset?.kind === "image"
+                  ? "Photo"
+                  : asset?.kind === "audio"
+                    ? "Audio"
+                    : "Video"}
           {!inRange && " · playhead is outside this clip"}
         </p>
       </div>
 
       {layer.kind === "text" && <TextInspector layer={layer} />}
       {layer.kind === "shape" && <ShapeInspector layer={layer} />}
+      {layer.kind === "placeholder" && (
+        <section className="border-line-soft border-b px-4 py-3">
+          <p className="mb-2 text-[12px] text-ink-soft leading-relaxed">
+            This slot shows only while you edit; it isn't in the exported video.
+            Add your own clip and it takes this place and time.
+          </p>
+          <button
+            type="button"
+            onClick={() => pickForPlaceholder(layer.id)}
+            className="h-9 w-full rounded-full bg-flare font-semibold text-flare-ink transition-colors hover:bg-ink"
+          >
+            Add a video or photo
+          </button>
+        </section>
+      )}
 
       {visual && (
         <Section title="Transform">
@@ -311,7 +329,7 @@ function LayerInspector({ layer }: { layer: Layer }) {
         </Section>
       )}
 
-      {visual && (
+      {visual && layer.kind !== "placeholder" && (
         <Section title="Color">
           <div className="-mx-1 mb-2 flex gap-1 overflow-x-auto px-1 pb-1">
             {LOOKS.map((look) => (
@@ -380,7 +398,7 @@ function LayerInspector({ layer }: { layer: Layer }) {
 
       {layer.kind === "media" && <TransitionControl layer={layer} />}
 
-      {visual && (
+      {visual && layer.kind !== "placeholder" && (
         <EffectsInspector layer={layer} at={at} set={set} kfButton={kfButton} />
       )}
 

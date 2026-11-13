@@ -7,6 +7,7 @@ import {
   appendAsset,
   isSameMedia,
   type Micros,
+  type Project,
   parseCaptions,
   projectDuration,
   setAspect,
@@ -74,7 +75,11 @@ async function importCaptions(file: File): Promise<void> {
  */
 export async function importFiles(
   files: Iterable<File>,
-  opts: { at?: Micros } = {},
+  opts: {
+    at?: Micros;
+    /** Put each new file somewhere else than the timeline's usual place. */
+    place?: (draft: Project, assetId: string) => void;
+  } = {},
 ): Promise<void> {
   const { setImporting, toast, restoring } = useEditor.getState();
   const list = [...files];
@@ -130,7 +135,8 @@ export async function importFiles(
           if (wasEmpty && asset.kind !== "audio") {
             setAspect(d, nearestAspect(asset.width, asset.height));
           }
-          appendAsset(d, asset.id, opts.at ?? playhead);
+          if (opts.place) opts.place(d, asset.id);
+          else appendAsset(d, asset.id, opts.at ?? playhead);
         });
       } catch (err) {
         const msg =

@@ -193,6 +193,12 @@ function checkLayer(l: unknown, p: Obj): string | null {
       }
     }
   }
+  if (l.kind === "placeholder") {
+    if (!isStr(l.label) || !isVec2(l.size)) {
+      return `${where} is an invalid placeholder`;
+    }
+    return null;
+  }
   if (l.kind === "shape") {
     const st = l.style;
     const strokeOk = (v: unknown) =>

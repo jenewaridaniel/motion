@@ -294,6 +294,8 @@ function drawLayer(
     });
     return;
   }
+  // An empty slot for the user's media: nothing to draw (the editor shows it).
+  if (layer.kind === "placeholder") return;
   if (layer.kind === "shape") {
     out.push({
       key,

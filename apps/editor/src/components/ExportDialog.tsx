@@ -330,6 +330,7 @@ function Dialog() {
                 </Option>
               ))}
             </Choice>
+            <EmptySlotsNote />
             <button
               type="button"
               onClick={start}
@@ -491,5 +492,22 @@ function Option({
     >
       {children}
     </button>
+  );
+}
+
+/** Placeholders aren't in the video; say so before exporting. */
+function EmptySlotsNote() {
+  const project = useEditor((s) => s.project);
+  const empty = Object.values(project.compositions)
+    .flatMap((c) => c.tracks)
+    .flatMap((t) => t.layers)
+    .filter((l) => l.kind === "placeholder").length;
+  if (empty === 0) return null;
+  return (
+    <p className="rounded-md bg-panel-2 px-3 py-2 text-[12px] text-ink-soft leading-relaxed">
+      {empty === 1
+        ? "1 placeholder is still empty. It won't be in the video (that part shows what's under it)."
+        : `${empty} placeholders are still empty. They won't be in the video (those parts show what's under them).`}
+    </p>
   );
 }

@@ -63,6 +63,10 @@ Planned layer kinds, which slot into the same union: `solid`, `adjustment`. (`sh
 
 `core.TEMPLATES` lists ready-made starting projects; `core.projectFromTemplate(id)` builds one with the ordinary edit functions (text, shapes, animations, background), so the result is a normal project. The editor draws each card's picture with the real renderer (`lib/templatePreview.ts`), one at a time, and caches it.
 
+## Placeholders
+
+`PlaceholderLayer` (`kind: "placeholder"`) is an empty slot for the user's media, used by templates. `evaluateFrame` draws nothing for it, so it can't reach an export. The editor shows it from `core.placeholdersAt` (corners on the canvas, top track first) and `placeholderHit`; `core.fillPlaceholder` replaces it with a media clip that covers the slot, cropped with a rect mask when the shapes differ. Sound extracted from a video keeps `linkedTo` that clip, so it follows its transitions while their timing matches.
+
 ## Working on the canvas
 
 `core/canvas.ts` hit-tests draws (topmost rectangle under a point, following rotation and scale) and turns a drag into a position change in the parent's space. It also has the handle maths: `scaleFromHandle` (even scale from distance to the anchor) and `angleStep` / `snapRotation` (rotation added up step by step). The engine keeps the last frame's draws and rectangles; `CanvasOverlay` sits over the preview for select, drag, centre snapping and the selection outline.

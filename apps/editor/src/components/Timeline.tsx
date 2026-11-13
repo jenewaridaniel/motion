@@ -830,13 +830,15 @@ function Clip({
   const w = Math.max(4, (layer.duration / US) * pps);
 
   const color =
-    layer.kind === "text"
-      ? "bg-clip-title"
-      : track.kind === "audio"
-        ? "bg-clip-audio"
-        : track.magnetic
-          ? "bg-clip-main"
-          : "bg-clip-overlay";
+    layer.kind === "placeholder"
+      ? "bg-panel-2 outline-1 outline-ink-faint outline-dashed -outline-offset-4"
+      : layer.kind === "text"
+        ? "bg-clip-title"
+        : track.kind === "audio"
+          ? "bg-clip-audio"
+          : track.magnetic
+            ? "bg-clip-main"
+            : "bg-clip-overlay";
 
   const keyframeTimes = useMemo(() => {
     if (!selected) return [];
@@ -992,11 +994,13 @@ function Clip({
       ? TextIcon
       : layer.kind === "shape"
         ? ShapesIcon
-        : asset?.kind === "image"
-          ? ImageIcon
-          : asset?.kind === "audio"
-            ? MusicIcon
-            : VideoIcon;
+        : layer.kind === "placeholder"
+          ? PlusIcon
+          : asset?.kind === "image"
+            ? ImageIcon
+            : asset?.kind === "audio"
+              ? MusicIcon
+              : VideoIcon;
   const speed =
     layer.kind === "media" && layer.speed !== 1
       ? `${+layer.speed.toFixed(2)}×`

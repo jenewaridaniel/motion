@@ -162,3 +162,71 @@ export function handleSizes(touch: boolean, side: number): HandleSizes {
     rotateOffset: target + 4,
   };
 }
+
+/** An empty slot for the user's media, as the editor shows it. */
+export interface PlaceholderView {
+  layerId: Id;
+  label: string;
+  /** Corners on the canvas (top-left, top-right, bottom-right, bottom-left). */
+  corners: [Point, Point, Point, Point];
+}
+
+/** The placeholders on screen at time `t` (root composition), top first. */
+export function placeholdersAt(p: Project, t: Micros): PlaceholderView[] {
+  const comp = p.compositions[p.rootCompositionId];
+  if (!comp) return [];
+  const out: PlaceholderView[] = [];
+  for (const track of comp.tracks) {
+    if (track.hidden || track.kind !== "visual") continue;
+    for (const l of track.layers) {
+      if (
+        l.kind !== "placeholder" ||
+        t < l.start ||
+        t >= l.start + l.duration
+      ) {
+        continue;
+      }
+      const m = multiply(
+        parentMatrixAt(p, l.id, t),
+        layerMatrix(l, t - l.start),
+      );
+      const [w, h] = l.size;
+      out.push({
+        layerId: l.id,
+        label: l.label,
+        corners: rectCorners(m, { x: -w / 2, y: -h / 2, width: w, height: h }),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * The topmost placeholder containing canvas point (x, y), if any. `views`
+ * come from `placeholdersAt`, which lists the top track first.
+ */
+export function placeholderHit(
+  views: PlaceholderView[],
+  x: number,
+  y: number,
+): Id | null {
+  for (const v of views) {
+    // Inside a convex quad: the same side of every edge.
+    let sign = 0;
+    let inside = true;
+    for (let j = 0; j < 4; j++) {
+      const [ax, ay] = v.corners[j] as Point;
+      const [bx, by] = v.corners[(j + 1) % 4] as Point;
+      const cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+      if (cross === 0) continue;
+      const s = Math.sign(cross);
+      if (sign === 0) sign = s;
+      else if (s !== sign) {
+        inside = false;
+        break;
+      }
+    }
+    if (inside) return v.layerId;
+  }
+  return null;
+}

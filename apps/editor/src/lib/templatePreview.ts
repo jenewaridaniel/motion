@@ -4,6 +4,7 @@
  */
 import {
   evaluateFrame,
+  placeholdersAt,
   projectFromTemplate,
   rootComposition,
   sec,
@@ -35,7 +36,30 @@ async function draw(id: string, width: number): Promise<string | null> {
       compHeight: comp.height,
       background: comp.background,
     });
-    const blob = await canvas.convertToBlob({ type: "image/png" });
+    // Show the template's empty slots, as the editor does.
+    const out = new OffscreenCanvas(width, height);
+    const ctx = out.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(canvas, 0, 0);
+    const k = width / comp.width;
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    for (const slot of placeholdersAt(p, sec(t.previewAt))) {
+      ctx.beginPath();
+      for (const [i, [x, y]] of slot.corners.entries()) {
+        // Inset a little so full-canvas slots show their edge.
+        const ix = Math.min(Math.max(x * k, 2), width - 2);
+        const iy = Math.min(Math.max(y * k, 2), height - 2);
+        if (i === 0) ctx.moveTo(ix, iy);
+        else ctx.lineTo(ix, iy);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    const blob = await out.convertToBlob({ type: "image/png" });
     return URL.createObjectURL(blob);
   } catch (err) {
     console.warn("[motion] template preview", id, err);

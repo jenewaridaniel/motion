@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addAsset, appendAsset } from "./edit.ts";
+import { addAsset, fillPlaceholder } from "./edit.ts";
 import { evaluateFrame, projectDuration } from "./evaluate.ts";
 import { ASPECTS, type Asset, rootComposition } from "./model.ts";
 import { parseProject } from "./serialize.ts";
@@ -82,7 +82,10 @@ describe("templates", () => {
       hasAudio: false,
     };
     addAsset(p, video);
-    appendAsset(p, "v");
+    const slot = rootComposition(p)
+      .tracks.find((t) => t.magnetic)!
+      .layers.find((l) => l.kind === "placeholder")!;
+    fillPlaceholder(p, slot.id, "v");
     const order = evaluateFrame(p, sec(2)).map((d) =>
       d.source.kind === "video" ? "video" : "graphic",
     );

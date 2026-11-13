@@ -31,6 +31,7 @@ import {
   type MediaLayer,
   maxLayerDuration,
   newId,
+  type PlaceholderLayer,
   type Project,
   rootComposition,
   type ShapeLayer,
@@ -322,6 +323,107 @@ export function addShape(
   track.layers.push(layer);
   sortTrack(track);
   return layer.id;
+}
+
+// ---------------------------------------------------------------- placeholders
+
+/**
+ * Add a slot for the user's video or photo. On the main track it joins the
+ * end like a clip (the main track has no gaps); otherwise it goes on its own
+ * overlay track at `at`.
+ */
+export function addPlaceholder(
+  p: Project,
+  at: Micros,
+  opts: {
+    label: string;
+    duration: Micros;
+    /** Centre on the canvas (default: the middle). */
+    position?: Vec2;
+    /** Canvas pixels (default: the whole canvas). */
+    size?: Vec2;
+    main?: boolean;
+  },
+): Id {
+  const comp = rootComposition(p);
+  const layer: PlaceholderLayer = {
+    id: newId(),
+    kind: "placeholder",
+    name: opts.label,
+    label: opts.label,
+    start: Math.max(0, Math.round(at)),
+    duration: Math.max(frame(comp), Math.round(opts.duration)),
+    transform: {
+      anchor: prop<Vec2>([0, 0]),
+      position: prop<Vec2>(opts.position ?? [comp.width / 2, comp.height / 2]),
+      scale: prop<Vec2>([1, 1]),
+      rotation: prop(0),
+    },
+    opacity: prop(1),
+    size: opts.size ?? [comp.width, comp.height],
+  };
+  if (opts.main) {
+    const track = mainTrack(comp);
+    layer.start = track.layers.reduce(
+      (end, l) => Math.max(end, layerEnd(l)),
+      0,
+    );
+    track.layers.push(layer);
+    packTrack(track);
+    return layer.id;
+  }
+  const track = createTrack("visual", { name: "Overlay" });
+  track.layers.push(layer);
+  // Under text and graphics, over the main track.
+  const main = comp.tracks.findIndex((t) => t.magnetic);
+  comp.tracks.splice(main < 0 ? comp.tracks.length : main, 0, track);
+  return layer.id;
+}
+
+/**
+ * Put an imported video or photo into a placeholder: same place, time and
+ * track. The media covers the slot (scaled to fill it) and is cropped to it
+ * with a mask when its shape differs. Returns the new clip's id.
+ */
+export function fillPlaceholder(
+  p: Project,
+  placeholderId: Id,
+  assetId: Id,
+): Id | null {
+  const loc = findLayer(p, placeholderId);
+  const asset = p.assets[assetId];
+  if (!loc || loc.layer.kind !== "placeholder" || !asset) return null;
+  if (asset.kind === "audio" || !asset.width || !asset.height) return null;
+  const slot = loc.layer;
+  const media = createMediaLayer(asset, loc.comp, slot.start);
+  media.duration =
+    asset.kind === "video"
+      ? Math.min(slot.duration, asset.duration)
+      : slot.duration;
+  const [w, h] = slot.size;
+  const cover = Math.max(w / asset.width, h / asset.height);
+  const [sx, sy] = slot.transform.scale.value;
+  media.transform = {
+    anchor: prop<Vec2>([asset.width / 2, asset.height / 2]),
+    position: prop<Vec2>([...slot.transform.position.value] as Vec2),
+    scale: prop<Vec2>([cover * sx, cover * sy]),
+    rotation: prop(slot.transform.rotation.value),
+  };
+  // Crop to the slot when the media sticks out of it (and the slot doesn't
+  // fill the canvas, which crops anyway).
+  const fw = w / (asset.width * cover);
+  const fh = h / (asset.height * cover);
+  const fillsCanvas = w >= loc.comp.width && h >= loc.comp.height;
+  if (!fillsCanvas && (fw < 0.999 || fh < 0.999)) {
+    media.mask = {
+      ...defaultMask("rect"),
+      size: prop<Vec2>([fw, fh]),
+      feather: prop(0),
+    };
+  }
+  loc.track.layers.splice(loc.index, 1, media);
+  packTrack(loc.track);
+  return media.id;
 }
 
 function findShape(p: Project, layerId: Id): ShapeLayer | null {
@@ -1010,6 +1112,13 @@ export function setAspect(p: Project, aspect: AspectKey): void {
   comp.height = height;
   for (const track of comp.tracks) {
     for (const layer of track.layers) {
+      if (layer.kind === "placeholder") {
+        // A slot covers the same share of the canvas.
+        const pos = layer.transform.position;
+        pos.value = [pos.value[0] * sx, pos.value[1] * sy];
+        layer.size = [layer.size[0] * sx, layer.size[1] * sy];
+        continue;
+      }
       if (layer.kind === "text" || layer.kind === "shape") {
         // Same fraction of the canvas, so a caption near the bottom stays there.
         const pos = layer.transform.position;

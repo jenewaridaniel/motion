@@ -6,6 +6,8 @@ import {
   handleSizes,
   layerHitTest,
   parentMatrixAt,
+  placeholderHit,
+  placeholdersAt,
   rectCorners,
   scaleFromHandle,
   setPropertyValue,
@@ -21,6 +23,7 @@ import {
   useState,
 } from "react";
 import { engine } from "../lib/engine.ts";
+import { pickForPlaceholder } from "../state/placeholders.ts";
 import { useEditor } from "../state/store.ts";
 
 /** How close (in screen pixels) a layer's centre must be to snap to a centre line. */
@@ -80,6 +83,9 @@ export function CanvasOverlay({
 }) {
   const ref = useRef<SVGSVGElement>(null);
   const selection = useEditor((s) => s.selection);
+  const project = useEditor((s) => s.project);
+  const playhead = useEditor((s) => s.playhead);
+  const slots = placeholdersAt(project, playhead);
   // Redraw the outline whenever the preview draws a new frame.
   const [, frameDrawn] = useReducer((n: number) => n + 1, 0);
   useEffect(() => engine.onFrame(frameDrawn), []);
@@ -207,8 +213,14 @@ export function CanvasOverlay({
     if (e.button !== 0) return;
     const [x, y] = toCanvas(e);
     const { draws, rects } = engine.lastFrame;
-    const id = layerHitTest(draws, rects, x, y);
     const s = useEditor.getState();
+    const drawn = layerHitTest(draws, rects, x, y);
+    if (!drawn) {
+      // Empty slots aren't drawn, but you can still click them.
+      s.select(placeholderHit(slots, x, y));
+      return;
+    }
+    const id = drawn;
     s.select(id);
     if (!id) return;
     const layer = findLayer(s.project, id)?.layer;
@@ -323,6 +335,63 @@ export function CanvasOverlay({
           strokeDasharray="4 4"
         />
       )}
+      {slots.map((slot) => {
+        const pts = slot.corners.map(([x, y]) => [x * k, y * k]);
+        const cx = pts.reduce((a, p) => a + (p[0] ?? 0), 0) / 4;
+        const cy = pts.reduce((a, p) => a + (p[1] ?? 0), 0) / 4;
+        const active = slot.layerId === selection;
+        return (
+          <g key={slot.layerId} data-placeholder={slot.layerId}>
+            <polygon
+              points={pts.map((p) => p.join(",")).join(" ")}
+              fill="rgba(255,255,255,0.04)"
+              stroke={active ? "var(--color-flare)" : "rgba(255,255,255,0.55)"}
+              strokeWidth={1.5}
+              strokeDasharray="6 5"
+              pointerEvents="none"
+            />
+            <text
+              x={cx}
+              y={cy - 14}
+              textAnchor="middle"
+              fill="rgba(255,255,255,0.8)"
+              fontSize={12}
+              pointerEvents="none"
+            >
+              {slot.label}
+            </text>
+            {/* Pointer shortcut only (this overlay is hidden from screen
+                readers); the same action is a real button in the settings. */}
+            <g
+              style={{ cursor: "pointer" }}
+              data-add-placeholder={slot.layerId}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                if (e.button === 0) pickForPlaceholder(slot.layerId);
+              }}
+            >
+              <rect
+                x={cx - 42}
+                y={cy - 4}
+                width={84}
+                height={28}
+                rx={14}
+                fill="var(--color-flare)"
+              />
+              <text
+                x={cx}
+                y={cy + 14}
+                textAnchor="middle"
+                fill="var(--color-flare-ink)"
+                fontSize={12}
+                fontWeight={600}
+              >
+                + Add
+              </text>
+            </g>
+          </g>
+        );
+      })}
       {outline && (
         <polygon
           points={outline}

@@ -178,7 +178,26 @@ export interface ShapeLayer extends LayerBase {
   style: ShapeStyle;
 }
 
-export type Layer = MediaLayer | CompositionLayer | TextLayer | ShapeLayer;
+/**
+ * A slot for the user's own video or photo ("Your video here"), used by
+ * templates. It draws nothing in the picture (so it can never end up in an
+ * export); the editor shows it as a dashed box with an Add button. Layer
+ * space is centred on the slot, like shapes.
+ */
+export interface PlaceholderLayer extends LayerBase {
+  kind: "placeholder";
+  /** What to put there, e.g. "Your video". */
+  label: string;
+  /** Width and height in layer pixels. */
+  size: Vec2;
+}
+
+export type Layer =
+  | MediaLayer
+  | CompositionLayer
+  | TextLayer
+  | ShapeLayer
+  | PlaceholderLayer;
 
 /** Layers that play part of a source (a file or a nested composition). */
 export type SourceLayer = MediaLayer | CompositionLayer;
@@ -468,7 +487,11 @@ export function findTrack(
 
 /** Longest the layer can last given its source and speed. */
 export function maxLayerDuration(p: Project, layer: Layer): Micros {
-  if (layer.kind === "text" || layer.kind === "shape") {
+  if (
+    layer.kind === "text" ||
+    layer.kind === "shape" ||
+    layer.kind === "placeholder"
+  ) {
     return Number.POSITIVE_INFINITY;
   }
   if (layer.kind === "media") {
