@@ -3,13 +3,21 @@ import {
   evaluateFrame,
   type Micros,
   projectDuration,
+  type Rect,
   rootComposition,
   US,
+  type VisualDraw,
 } from "@motion/core";
 import { AudioPreview, FrameProvider } from "@motion/media";
 import { Compositor } from "@motion/renderer";
 import { getHandle } from "../state/media.ts";
 import { useEditor } from "../state/store.ts";
+
+export interface DrawnFrame {
+  draws: VisualDraw[];
+  /** Each draw's rectangle in its layer space, by draw key. */
+  rects: Map<string, Rect>;
+}
 
 /** How far ahead to start decoding upcoming clips, so cuts don't stall. */
 const LOOKAHEAD: Micros = 0.4 * US;
@@ -23,6 +31,8 @@ class Engine {
   private frames = new FrameProvider(getHandle);
   private audio = new AudioPreview();
   private drawing = false;
+  private frame: DrawnFrame = { draws: [], rects: new Map() };
+  private frameListeners = new Set<() => void>();
   private pending: Micros | null = null;
   private raf = 0;
 
@@ -36,6 +46,17 @@ class Engine {
         this.request(s.playhead);
       }
     });
+  }
+
+  /** What the preview shows right now: the draws and their rectangles. */
+  get lastFrame(): DrawnFrame {
+    return this.frame;
+  }
+
+  /** Called after every preview frame. Returns an unsubscribe function. */
+  onFrame(cb: () => void): () => void {
+    this.frameListeners.add(cb);
+    return () => this.frameListeners.delete(cb);
   }
 
   attach(canvas: HTMLCanvasElement): string | null {
@@ -89,6 +110,18 @@ class Engine {
         compHeight: comp.height,
         background: comp.background,
       });
+      // Remember what is on screen and where, for clicking and dragging.
+      const rects = new Map<string, Rect>();
+      for (const [key, img] of images) {
+        rects.set(key, {
+          x: img.x,
+          y: img.y,
+          width: img.width,
+          height: img.height,
+        });
+      }
+      this.frame = { draws: finalDraws, rects };
+      for (const cb of this.frameListeners) cb();
     } catch (err) {
       console.error("[motion] preview", err);
     } finally {

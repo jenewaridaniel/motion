@@ -7,6 +7,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { engine } from "../lib/engine.ts";
 import { useEditor } from "../state/store.ts";
+import { CanvasOverlay } from "./CanvasOverlay.tsx";
 import { PauseIcon, PlayIcon, StepIcon } from "./icons.tsx";
 
 export function Preview() {
@@ -57,11 +58,21 @@ export function Preview() {
     >
       <div ref={wrapRef} className="relative min-h-0 flex-1 p-4 [contain:size]">
         <div className="absolute inset-4 flex items-center justify-center">
-          <canvas
-            ref={canvasRef}
-            style={{ width: box.w, height: box.h }}
-            className="rounded-sm shadow-[0_0_0_1px_var(--color-line-soft)]"
-          />
+          <div className="relative" style={{ width: box.w, height: box.h }}>
+            <canvas
+              ref={canvasRef}
+              style={{ width: box.w, height: box.h }}
+              className="block rounded-sm shadow-[0_0_0_1px_var(--color-line-soft)]"
+            />
+            {!empty && box.w > 0 && (
+              <CanvasOverlay
+                width={box.w}
+                height={box.h}
+                compWidth={compW}
+                compHeight={compH}
+              />
+            )}
+          </div>
           {error && (
             <p className="absolute max-w-sm rounded-lg bg-panel p-4 text-center text-ink-soft">
               {error}
