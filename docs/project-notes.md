@@ -170,15 +170,25 @@ My notes:
 - **Not tested:** a save failing (disk full) and being retried; a "Leave site?" warning while a large file is still being copied (built; with small test files the copy finished too fast to catch); browsers without storage (some private windows); Safari and Firefox; very large files (several GB).
 - Known limits: if a saved project can't be opened, it is kept in storage but there is no screen to get it back yet; once you edit the new project, the old one is no longer the one that opens. There is one project only, with no "New project" button, so starting over means deleting clips by hand.
 
+### Phase 1: foundation (2026-11-13)
+
+- **Git:** the repo already existed (your 02:52 commit, GitHub remote `origin`). Autosave and review fixes committed on top. Nothing pushed yet.
+- **Export quality, measured on a grainy 1080p clip (Mac, Chrome):**
+  - The compositor is lossless. Quality is set by the encoder.
+  - The hardware encoder already runs in constant-quality mode. "Standard / High / Max" give 4.9 / 10.2 / 17.6 Mbps and 43.5 / 47.9 / 50.3 dB brightness PSNR. Kept unchanged.
+  - Color detail stays at ~36 dB on the hardware encoder at any bitrate (its color conversion). It only shows on extreme synthetic grain.
+  - Changed: the fallback bitrate for encoders without constant quality (e.g. Chrome's software H.264). It was 6.1 Mbps at 1080p for both 30 and 60 fps. It is now 8 / 12.1 Mbps (`core.exportRateControl`).
+  - Earlier note that "High" was lower than phone quality was wrong (based on the library's formula, not a measurement).
+- **Export in a worker: not built, on purpose.** Measured during export: 4K60 single clip, 75 screen updates/s, worst pause 14 ms. Four stacked layers at 4K60, 69 updates/s, 3 pauses (worst 160 ms) in 6.4 s. Not worth the cost now: Web Audio (used to mix export audio, same as preview) isn't available in workers, so a worker needs a second audio path. Re-measure on phones and weak laptops.
+- **Not tested:** export quality on Windows/Linux, Safari, Firefox; real camera footage (only synthetic test clips).
+
 ## 12. Next step
 
-1. Put the project under version control (`git init`). There is no history or backup yet.
-2. Text layers (asked for next).
-3. Export quality: set our own bitrates (the library's "High" is about 6 Mbps at 1080p and ignores frame rate).
-4. Move export into a worker so the UI stays smooth.
-5. Phone layout and touch timeline (the editor shows a "coming next" notice on phones).
-6. Decide where the editor is hosted. The landing button points at `/app/` in production, and nothing is deployed there yet.
-7. A project list ("New project", open older projects), project file import/export.
-8. Thumbnails and waveforms on clips, transitions and effects.
+Agreed order (Phase 2 next):
+1. Text layers.
+2. Thumbnails and waveforms on clips.
+3. Phone layout and touch timeline (the editor shows a "coming next" notice on phones). Re-measure export smoothness there.
+4. A project list ("New project", open older projects), project file import/export.
+Then Phase 3 (transitions, filters and color, effects, audio tools, stickers, templates) and Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

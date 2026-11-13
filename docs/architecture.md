@@ -66,7 +66,7 @@ Every change goes through `History.apply(project, recipe, mergeKey?)`. That uses
 
 ## Not built yet (in order)
 
-1. Move preview decoding and export into a worker (Comlink plus OffscreenCanvas) so the UI never stutters during export.
+1. Export in a worker, only if measured stutter on weaker devices calls for it. Export already stays smooth on a Mac (see project-notes). Web Audio isn't available in workers, so audio mixing would stay on the main thread and stream chunks to the worker.
 2. Project file import/export (to move a project between devices) and a project list.
 3. Render-to-texture in the compositor: nested-comp clipping, group opacity, effects, masks, blend modes, transitions.
 4. Text and shape layers, the graph editor, motion paths on the canvas.
