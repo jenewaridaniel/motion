@@ -208,6 +208,16 @@ function checkLayer(l: unknown, p: Obj): string | null {
       return `${where} uses a missing asset`;
     }
     if (!isProperty(l.volume, isNum)) return `${where} has invalid volume`;
+    if (
+      l.fade !== undefined &&
+      (!isObj(l.fade) ||
+        !isNum(l.fade.in) ||
+        !isNum(l.fade.out) ||
+        l.fade.in < 0 ||
+        l.fade.out < 0)
+    ) {
+      return `${where} has an invalid sound fade`;
+    }
     return null;
   }
   if (l.kind === "composition") {

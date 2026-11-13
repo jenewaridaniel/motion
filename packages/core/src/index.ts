@@ -16,3 +16,4 @@ export * from "./serialize.ts";
 export * from "./text-animation.ts";
 export * from "./time.ts";
 export * from "./transitions.ts";
+export * from "./wav.ts";

@@ -120,6 +120,12 @@ export const MusicIcon = (p: P) => (
     <circle cx="11.2" cy="10.5" r="1.8" />
   </Svg>
 );
+export const MicIcon = (p: P) => (
+  <Svg {...p}>
+    <rect x="5.5" y="1.75" width="5" height="8" rx="2.5" />
+    <path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2" />
+  </Svg>
+);
 export const TextIcon = (p: P) => (
   <Svg {...p}>
     <path d="M3 4V2.5h10V4M8 2.5v11M6 13.5h4" />

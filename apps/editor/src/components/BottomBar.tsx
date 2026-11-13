@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { useEditor } from "../state/store.ts";
+import { toggleVoiceover, useVoiceover } from "../state/voiceover.ts";
 import {
   ImageIcon,
+  MicIcon,
   RedoIcon,
   SplitIcon,
   TextIcon,
@@ -25,6 +27,7 @@ export function BottomBar({ onOpen }: { onOpen: (sheet: SheetName) => void }) {
   const canUndo = useEditor((s) => s.canUndo);
   const canRedo = useEditor((s) => s.canRedo);
   const { undo, redo } = useEditor.getState();
+  const recording = useVoiceover((s) => s.recording);
 
   return (
     <nav
@@ -49,6 +52,17 @@ export function BottomBar({ onOpen }: { onOpen: (sheet: SheetName) => void }) {
       >
         <EditGlyph />
       </Tool>
+      <Tool
+        label={recording ? "Stop" : "Voice"}
+        onClick={toggleVoiceover}
+        active={recording}
+      >
+        {recording ? (
+          <span className="size-3 animate-pulse rounded-full bg-danger" />
+        ) : (
+          <MicIcon />
+        )}
+      </Tool>
       <Tool label="Split" onClick={splitAtPlayhead}>
         <SplitIcon />
       </Tool>
@@ -69,11 +83,13 @@ function Tool({
   label,
   onClick,
   disabled,
+  active,
   children,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  active?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -81,7 +97,8 @@ function Tool({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex min-h-14 min-w-11 flex-1 flex-col items-center justify-center gap-1 rounded-lg text-[10px] text-ink-soft transition-colors active:bg-raised disabled:opacity-35"
+      aria-pressed={active}
+      className={`flex min-h-14 min-w-11 flex-1 flex-col items-center justify-center gap-1 rounded-lg text-[10px] transition-colors active:bg-raised disabled:opacity-35 ${active ? "text-danger" : "text-ink-soft"}`}
     >
       {children}
       {label}

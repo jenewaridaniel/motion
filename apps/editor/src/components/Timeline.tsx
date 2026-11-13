@@ -41,11 +41,13 @@ import {
 import { useCompact } from "../lib/useCompact.ts";
 import { ACCEPT, importFiles } from "../state/media.ts";
 import { MAX_ZOOM, MIN_ZOOM, useEditor } from "../state/store.ts";
+import { toggleVoiceover, useVoiceover } from "../state/voiceover.ts";
 import { ClipVisuals } from "./ClipVisuals.tsx";
 import {
   EyeIcon,
   ImageIcon,
   LayersIcon,
+  MicIcon,
   MusicIcon,
   PlusIcon,
   RedoIcon,
@@ -371,6 +373,7 @@ export function Timeline({ fill = false }: { fill?: boolean }) {
             <TextIcon width={14} height={14} />
             Text
           </button>
+          <RecordButton />
           <div className="ml-auto flex items-center gap-2">
             <IconButton
               label="Fit timeline"
@@ -696,6 +699,61 @@ function TrackRow({
   );
 }
 
+/** Dark wedges over a clip's sound fades: silent at the outer edge. */
+function FadeShapes({
+  fade,
+  duration,
+  pps,
+}: {
+  fade: { in: Micros; out: Micros };
+  duration: Micros;
+  pps: number;
+}) {
+  // Same shrink-to-fit rule as the sound (core's collectAudioSegments).
+  let fi = Math.min(fade.in, duration);
+  let fo = Math.min(fade.out, duration);
+  if (fi + fo > duration) {
+    const k = duration / (fi + fo);
+    fi *= k;
+    fo *= k;
+  }
+  const w = (duration / US) * pps;
+  const a = (fi / US) * pps;
+  const b = w - (fo / US) * pps;
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 h-full"
+      width={w}
+      preserveAspectRatio="none"
+      viewBox={`0 0 ${Math.max(1, w)} 100`}
+    >
+      {a > 0 && <path d={`M0 0 L${a} 0 L0 100 Z`} fill="rgba(0,0,0,0.45)" />}
+      {b < w && (
+        <path d={`M${b} 0 L${w} 0 L${w} 100 Z`} fill="rgba(0,0,0,0.45)" />
+      )}
+      {a > 0 && (
+        <path
+          d={`M0 100 L${a} 0`}
+          stroke="rgba(255,255,255,0.7)"
+          strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
+          fill="none"
+        />
+      )}
+      {b < w && (
+        <path
+          d={`M${b} 0 L${w} 100`}
+          stroke="rgba(255,255,255,0.7)"
+          strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
+          fill="none"
+        />
+      )}
+    </svg>
+  );
+}
+
 /** Times a dragged edge can snap to: zero, the playhead and other clip edges. */
 function snapTargets(exclude: Id): Micros[] {
   const s = useEditor.getState();
@@ -970,6 +1028,9 @@ function Clip({
           pxPerSec={pps}
         />
       )}
+      {layer.kind === "media" && layer.fade && (
+        <FadeShapes fade={layer.fade} duration={layer.duration} pps={pps} />
+      )}
       <div className="pointer-events-none relative flex h-full items-start gap-1.5 px-2.5 pt-1.5 text-[11px] text-ink">
         <Icon
           width={12}
@@ -1008,5 +1069,38 @@ function Clip({
         />
       ))}
     </div>
+  );
+}
+
+/** Record a voiceover from the microphone, starting at the playhead. */
+function RecordButton() {
+  const recording = useVoiceover((s) => s.recording);
+  const since = useVoiceover((s) => s.since);
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (!recording) return;
+    const id = setInterval(() => setNow(performance.now()), 250);
+    return () => clearInterval(id);
+  }, [recording]);
+  const secs = recording ? Math.max(0, Math.floor((now - since) / 1000)) : 0;
+  return (
+    <button
+      type="button"
+      onClick={toggleVoiceover}
+      title={
+        recording ? "Stop recording" : "Record a voiceover at the playhead"
+      }
+      aria-pressed={recording}
+      className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 font-semibold text-[12px] transition-colors ${recording ? "bg-danger/20 text-danger" : "text-ink-soft hover:bg-raised hover:text-ink"}`}
+    >
+      {recording ? (
+        <span className="size-2.5 animate-pulse rounded-full bg-danger" />
+      ) : (
+        <MicIcon width={14} height={14} />
+      )}
+      {recording
+        ? `Stop ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`
+        : "Voiceover"}
+    </button>
   );
 }

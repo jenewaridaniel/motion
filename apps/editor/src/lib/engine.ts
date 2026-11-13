@@ -156,6 +156,11 @@ class Engine {
     this.raf = requestAnimationFrame(this.tick);
   }
 
+  /** Silence the preview's sound (while recording a voiceover). */
+  setMuted(muted: boolean): void {
+    this.audio.setMuted(muted);
+  }
+
   pause(): void {
     cancelAnimationFrame(this.raf);
     this.audio.stop();

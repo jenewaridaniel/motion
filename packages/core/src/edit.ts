@@ -27,6 +27,7 @@ import {
   type Id,
   type Layer,
   layerEnd,
+  type MediaLayer,
   maxLayerDuration,
   newId,
   type Project,
@@ -437,6 +438,9 @@ export function splitLayer(p: Project, layerId: Id, at: Micros): Id | null {
   }
   // A transition belongs to the cut before the clip: it stays on the left.
   delete right.transition;
+  // Sound fades stay at the outer ends: in on the left, out on the right.
+  if (layer.kind === "media" && layer.fade) setFade(layer, "out", 0);
+  if (right.kind === "media" && right.fade) setFade(right, "in", 0);
   // Shift keyframes so both halves keep exactly the same animation.
   forEachProperty(right, (prop) => shiftKeyframes(prop, -local));
   layer.duration = local;
@@ -459,6 +463,72 @@ export function deleteLayer(p: Project, layerId: Id): boolean {
     loc.comp.tracks = loc.comp.tracks.filter((t) => t !== loc.track);
   }
   return true;
+}
+
+/** Longest sound fade. */
+export const MAX_AUDIO_FADE: Micros = 10_000_000;
+
+function setFade(layer: MediaLayer, edge: "in" | "out", length: Micros) {
+  const fade = { in: 0, out: 0, ...layer.fade };
+  fade[edge] = Math.round(Math.min(MAX_AUDIO_FADE, Math.max(0, length)));
+  if (fade.in === 0 && fade.out === 0) delete layer.fade;
+  else layer.fade = fade;
+}
+
+/** Fade a clip's sound in at its start or out at its end; 0 removes it. */
+export function setAudioFade(
+  p: Project,
+  layerId: Id,
+  edge: "in" | "out",
+  length: Micros,
+): boolean {
+  const loc = findLayer(p, layerId);
+  if (!loc || loc.layer.kind !== "media") return false;
+  setFade(loc.layer, edge, length);
+  return true;
+}
+
+/**
+ * Move a video clip's sound onto its own audio clip (same timing), so it can
+ * be trimmed or moved separately. The video clip is muted. Returns the new
+ * audio clip's id, or null if there's no sound to take.
+ */
+export function extractAudio(p: Project, layerId: Id): Id | null {
+  const loc = findLayer(p, layerId);
+  if (!loc || loc.layer.kind !== "media" || loc.track.kind !== "visual") {
+    return null;
+  }
+  const { comp, layer } = loc;
+  const asset = p.assets[layer.assetId];
+  if (!asset || asset.kind !== "video" || !asset.hasAudio) return null;
+  const volume = isDraft(layer.volume)
+    ? current(layer.volume as never)
+    : layer.volume;
+  const silent = volume.keyframes?.length
+    ? volume.keyframes.every((k) => k.value <= 0)
+    : volume.value <= 0;
+  if (silent) return null;
+
+  const audio = createMediaLayer(asset, comp, layer.start);
+  audio.name = layer.name;
+  audio.duration = layer.duration;
+  audio.inPoint = layer.inPoint;
+  audio.speed = layer.speed;
+  audio.volume = structuredClone(volume);
+  if (layer.fade) audio.fade = { ...layer.fade };
+  let track = comp.tracks.find(
+    (t) => t.kind === "audio" && fits(t, audio.start, audio.duration),
+  );
+  if (!track) {
+    track = createTrack("audio", { name: "Audio" });
+    comp.tracks.push(track);
+  }
+  track.layers.push(audio);
+  sortTrack(track);
+
+  layer.volume = prop(0);
+  delete layer.fade;
+  return audio.id;
 }
 
 /** Change speed, keeping the in-point and the source span the clip covered. */

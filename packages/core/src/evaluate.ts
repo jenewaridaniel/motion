@@ -407,6 +407,28 @@ export function collectAudioSegments(
           fadeOut = { start: cut - half, end };
         }
       }
+      // The clip's own fades, joined with any transition fade at that end.
+      if (layer.fade) {
+        let fi = Math.min(layer.fade.in, layer.duration);
+        let fo = Math.min(layer.fade.out, layer.duration);
+        if (fi + fo > layer.duration) {
+          const k = layer.duration / (fi + fo);
+          fi = Math.floor(fi * k);
+          fo = Math.floor(fo * k);
+        }
+        if (fi > 0) {
+          const fadeEnd = layer.start + fi;
+          fadeIn = fadeIn
+            ? { start: fadeIn.start, end: Math.max(fadeIn.end, fadeEnd) }
+            : { start: layer.start, end: fadeEnd };
+        }
+        if (fo > 0) {
+          const fadeStart = layerEnd(layer) - fo;
+          fadeOut = fadeOut
+            ? { start: Math.min(fadeOut.start, fadeStart), end: fadeOut.end }
+            : { start: fadeStart, end: layerEnd(layer) };
+        }
+      }
       out.push({
         layerId: layer.id,
         assetId: asset.id,

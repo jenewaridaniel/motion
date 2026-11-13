@@ -6,6 +6,7 @@ import {
   addCaptions,
   appendAsset,
   isSameMedia,
+  type Micros,
   parseCaptions,
   projectDuration,
   setAspect,
@@ -71,7 +72,10 @@ async function importCaptions(file: File): Promise<void> {
  * Probe files and add them to the timeline. The first visual clip on an
  * empty timeline sets the canvas shape, like CapCut's "Original".
  */
-export async function importFiles(files: Iterable<File>): Promise<void> {
+export async function importFiles(
+  files: Iterable<File>,
+  opts: { at?: Micros } = {},
+): Promise<void> {
   const { setImporting, toast, restoring } = useEditor.getState();
   const list = [...files];
   if (list.length === 0) return;
@@ -126,7 +130,7 @@ export async function importFiles(files: Iterable<File>): Promise<void> {
           if (wasEmpty && asset.kind !== "audio") {
             setAspect(d, nearestAspect(asset.width, asset.height));
           }
-          appendAsset(d, asset.id, playhead);
+          appendAsset(d, asset.id, opts.at ?? playhead);
         });
       } catch (err) {
         const msg =

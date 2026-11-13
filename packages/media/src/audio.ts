@@ -164,6 +164,12 @@ export class AudioPreview {
     }
   }
 
+  /** Silence the preview's sound (e.g. while recording a voiceover). */
+  setMuted(muted: boolean): void {
+    this.ensure();
+    if (this.master) this.master.gain.value = muted ? 0 : 1;
+  }
+
   /** Current composition time on the audio clock. */
   get time(): Micros {
     if (!this.ctx || !this.playing) return this.from;

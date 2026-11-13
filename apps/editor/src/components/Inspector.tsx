@@ -28,6 +28,7 @@ import {
 } from "@motion/core";
 import type { ReactNode } from "react";
 import { useEditor, useSelectedLayer } from "../state/store.ts";
+import { AudioControls } from "./AudioControls.tsx";
 import { EffectsInspector } from "./EffectsInspector.tsx";
 import { Diamond } from "./icons.tsx";
 import { LutControl } from "./LutControl.tsx";
@@ -409,6 +410,7 @@ function LayerInspector({ layer }: { layer: Layer }) {
               trailing={kfButton("volume", "volume")}
             />
           )}
+          {asset?.hasAudio && <AudioControls layer={layer} asset={asset} />}
         </Section>
       )}
 

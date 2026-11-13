@@ -269,6 +269,18 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** listening to the crossfade (I can't hear the preview; only measured the export mix and the scheduled preview fades); crossfades on clips with speed changes; music on the audio track is unaffected by design (it has no transitions).
 
 
+### Phase 3, stage E: audio tools (2026-11-13)
+
+- Built:
+  - **Sound fades** on any clip with sound (Fade in / Fade out in the Clip section, 0 to 10 s). Equal-power curves; they shrink to fit a short clip, join a transition's crossfade at the same end, stay at the outer ends when a clip is split, and show as dark wedges on the clip in the timeline.
+  - **Extract audio**: a button for video clips. The sound becomes its own clip on an audio track with the same timing, volume, keyframes and fades; the video clip is muted. Undo puts it back.
+  - **Voiceover**: a Voiceover button in the timeline toolbar (Voice in the phone bar). It asks for the microphone, plays the video without its sound (so the speakers don't echo into the mic), and records raw samples into a WAV file, placed on an audio track where recording started. Shows a timer while recording.
+  - **Sound effects**: 9 built-in sounds made in code (Whoosh, Swish, Pop, Click, Ding, Notification, Riser, Impact, Camera shutter), listed in the Media panel with Listen and Add buttons. Added at the playhead as a normal WAV file; adding the same sound again reuses the file.
+  - Core: `setAudioFade`, `extractAudio`, `encodeWav`; 12 new core tests.
+- Tested by hand (port 5181, a project with two ffmpeg test clips, 440 Hz and 1000 Hz): every sound effect renders at its length with the same peak level and is identical each time; Add Whoosh twice (one file, two clips, second on a new track because they overlap); typed fades of 1 s / 0.5 s (the mixed sound follows the curve exactly: 0.383 / 0.708 / 0.924 at a quarter / half / three-quarters); Extract audio with the real button (video muted, audio clip at the same time and in-point, same loudness 0.1251 before and after); voiceover with a stand-in microphone producing a 660 Hz tone (placed where recording started, video played during recording and stopped after, the tone is in the clip at the right level, a timed 3 s recording came out 3.003 s); reload keeps everything and every file reopens; the full-project mix contains all of it.
+- **Not tested:** a real microphone (the browser's permission prompt can't be answered from here, so the mic was replaced by a tone; everything after the mic is the real code); how the sound effects actually sound (checked by measurement, not by ear); the phone-size Voice button; Safari and Firefox recording.
+- Known limits: an extracted clip doesn't keep a transition's crossfade (it cuts at the clip's edges); recording has a small delay (tens of milliseconds) between the mic and the timeline; long voiceovers are big (WAV, about 5.7 MB a minute).
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
@@ -276,7 +288,7 @@ Agreed order (Phase 2 next):
 2. ~~Thumbnails and waveforms on clips.~~ Done.
 3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
 4. ~~A project list~~ Done. **Phase 2 is complete** (only the real-phone test is left, and needs the user).
-Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. Next: E. audio tools (fades, voiceover, sound effects, extract audio), F. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
+Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. ~~E. audio tools~~ done. Next: F. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
 Then Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

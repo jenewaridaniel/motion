@@ -75,6 +75,8 @@ export interface MediaLayer extends LayerBase {
   speed: number;
   /** Linear gain, 0 to 2. */
   volume: Property<number>;
+  /** Sound fades at the clip's start and end (their lengths). */
+  fade?: { in: Micros; out: Micros };
 }
 
 /** A nested composition, used for grouping and motion design. */
