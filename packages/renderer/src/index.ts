@@ -1,6 +1,7 @@
 import {
   type Affine,
   type BlendMode,
+  type CubeLut,
   multiply,
   type VisualDraw,
 } from "@motion/core";
@@ -65,6 +66,11 @@ uniform highp vec2 u_maskCenter, u_maskSize, u_rectSize;
 uniform highp float u_maskRot, u_maskFeather;
 uniform bool u_maskInvert;
 uniform highp float u_glitch, u_seed, u_vignette, u_vignetteSize;
+precision highp sampler3D;
+uniform sampler3D u_lut;
+uniform bool u_useLut;
+uniform highp float u_lutIntensity, u_lutSize;
+uniform highp vec3 u_lutMin, u_lutMax;
 
 highp float hash(highp vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 highp vec2 cbcr(highp vec3 c) {
@@ -88,9 +94,6 @@ void main() {
   } else {
     c = texture(u_tex, uv);
   }
-  if (u_adjust && c.a > 0.0) {
-    c.rgb = adjust(c.rgb / c.a) * c.a;
-  }
   if (u_key && c.a > 0.0) {
     highp vec3 rgb = c.rgb / c.a;
     highp float d = distance(cbcr(rgb), cbcr(u_keyColor));
@@ -100,6 +103,16 @@ void main() {
     highp float near = 1.0 - smoothstep(t, t + 0.25, d);
     rgb = mix(rgb, vec3(luma(rgb)), u_keySpill * near);
     c = vec4(rgb * c.a, c.a) * keep;
+  }
+  // Grade after keying, so the key works on the original colours.
+  if (u_adjust && c.a > 0.0) {
+    c.rgb = adjust(c.rgb / c.a) * c.a;
+  }
+  if (u_useLut && c.a > 0.0) {
+    highp vec3 rgb = clamp((c.rgb / c.a - u_lutMin) / (u_lutMax - u_lutMin), 0.0, 1.0);
+    // Sample at texel centres: 0 maps to the first entry, 1 to the last.
+    highp vec3 graded = texture(u_lut, rgb * ((u_lutSize - 1.0) / u_lutSize) + 0.5 / u_lutSize).rgb;
+    c.rgb = mix(c.rgb / c.a, graded, u_lutIntensity) * c.a;
   }
   if (u_maskShape > 0) {
     highp vec2 p = (v_uv - u_maskCenter) * u_rectSize;
@@ -185,6 +198,11 @@ const FX_UNIFORMS = [
   "u_seed",
   "u_vignette",
   "u_vignetteSize",
+  "u_useLut",
+  "u_lutIntensity",
+  "u_lutSize",
+  "u_lutMin",
+  "u_lutMax",
 ] as const;
 
 const MASK_SHAPE_ID = { rect: 1, ellipse: 2, linear: 3 } as const;
@@ -245,6 +263,8 @@ export interface RenderInput {
   compWidth: number;
   compHeight: number;
   background: string;
+  /** Project LUTs by id, for draws whose style uses one. */
+  luts?: ReadonlyMap<string, CubeLut>;
 }
 
 /**
@@ -261,6 +281,8 @@ export class Compositor {
   >;
   private blurTargets = new Map<string, BlurTarget>();
   private fx = new Map<string, WebGLUniformLocation | null>();
+  /** 3D textures for LUTs, with the table each was made from. */
+  private lutTextures = new Map<string, { tex: WebGLTexture; from: CubeLut }>();
   private uMatrix: WebGLUniformLocation | null;
   private uOpacity: WebGLUniformLocation | null;
   private uAdjust: WebGLUniformLocation | null;
@@ -324,6 +346,7 @@ export class Compositor {
     for (const k of FX_UNIFORMS) {
       this.fx.set(k, gl.getUniformLocation(program, k));
     }
+    gl.uniform1i(gl.getUniformLocation(program, "u_lut"), 1);
     gl.uniform1i(gl.getUniformLocation(program, "u_tex"), 0);
 
     const vao = gl.createVertexArray();
@@ -391,6 +414,62 @@ export class Compositor {
     if (glitch) gl.uniform1f(u("u_seed"), glitch.seed % 1000);
     gl.uniform1f(u("u_vignette"), vignette ? vignette.amount : 0);
     if (vignette) gl.uniform1f(u("u_vignetteSize"), vignette.size);
+  }
+
+  private setLut(
+    draw: VisualDraw,
+    luts: ReadonlyMap<string, CubeLut> | undefined,
+  ) {
+    const gl = this.gl;
+    const u = (k: (typeof FX_UNIFORMS)[number]) => this.fx.get(k) ?? null;
+    const use = draw.style.lut;
+    const lut = use && luts?.get(use.id);
+    gl.uniform1i(u("u_useLut"), lut ? 1 : 0);
+    if (!use || !lut) return;
+    let entry = this.lutTextures.get(use.id);
+    if (!entry || entry.from !== lut) {
+      if (entry) gl.deleteTexture(entry.tex);
+      const tex = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_3D, tex);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      for (const wrap of [
+        gl.TEXTURE_WRAP_S,
+        gl.TEXTURE_WRAP_T,
+        gl.TEXTURE_WRAP_R,
+      ]) {
+        gl.texParameteri(gl.TEXTURE_3D, wrap, gl.CLAMP_TO_EDGE);
+      }
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      // WebGL refuses raw-number 3D uploads while premultiply is on (it is on
+      // for images and video frames), so switch it off for this upload.
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      // Half-float keeps the LUT's precision and can be filtered everywhere.
+      gl.texImage3D(
+        gl.TEXTURE_3D,
+        0,
+        gl.RGB16F,
+        lut.size,
+        lut.size,
+        lut.size,
+        0,
+        gl.RGB,
+        gl.FLOAT,
+        lut.data,
+      );
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      entry = { tex, from: lut };
+      this.lutTextures.set(use.id, entry);
+    }
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_3D, entry.tex);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1f(u("u_lutIntensity"), use.intensity);
+    gl.uniform1f(u("u_lutSize"), lut.size);
+    gl.uniform3f(u("u_lutMin"), ...lut.domainMin);
+    gl.uniform3f(u("u_lutMax"), ...lut.domainMax);
   }
 
   private makeTarget(w: number, h: number) {
@@ -569,6 +648,7 @@ export class Compositor {
         }
       }
       this.setEffects(draw, placed);
+      this.setLut(draw, input.luts);
       if (draw.style.blur > 0) {
         const blurred = this.blur(draw, placed, tex);
         gl.activeTexture(gl.TEXTURE0);
@@ -603,6 +683,8 @@ export class Compositor {
     this.textures.clear();
     for (const t of this.blurTargets.values()) this.freeBlur(t);
     this.blurTargets.clear();
+    for (const l of this.lutTextures.values()) this.gl.deleteTexture(l.tex);
+    this.lutTextures.clear();
     this.uploaded.clear();
     if (opts.loseContext) {
       this.gl.getExtension("WEBGL_lose_context")?.loseContext();

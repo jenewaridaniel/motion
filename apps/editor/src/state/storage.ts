@@ -257,12 +257,15 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   return out.sort((a, b) => b.savedAt - a.savedAt);
 }
 
-/** Ids a stored project uses in the media store: its media and its fonts. */
+/** Ids a stored project uses in the media store: media, fonts and LUTs. */
 function filesOf(record: unknown): string[] {
-  const p = (record as { project?: { assets?: unknown; fonts?: unknown } })
-    ?.project;
+  const p = (
+    record as {
+      project?: { assets?: unknown; fonts?: unknown; luts?: unknown };
+    }
+  )?.project;
   const ids: string[] = [];
-  for (const list of [p?.assets, p?.fonts]) {
+  for (const list of [p?.assets, p?.fonts, p?.luts]) {
     if (list && typeof list === "object") ids.push(...Object.keys(list));
   }
   return ids;
@@ -372,10 +375,12 @@ export async function pruneMedia(): Promise<number> {
       // Read asset ids even from projects that fail to load, so their files
       // are kept in case they can be recovered later.
       const project = (
-        c.value as { project?: { assets?: unknown; fonts?: unknown } }
+        c.value as {
+          project?: { assets?: unknown; fonts?: unknown; luts?: unknown };
+        }
       )?.project;
-      // Imported media and added font files both live in the media store.
-      for (const list of [project?.assets, project?.fonts]) {
+      // Imported media, font files and LUT files all live in the media store.
+      for (const list of [project?.assets, project?.fonts, project?.luts]) {
         if (list && typeof list === "object") {
           for (const id of Object.keys(list)) used.add(id);
         }

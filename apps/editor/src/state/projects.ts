@@ -198,6 +198,7 @@ export async function saveProjectFile(id: string, name: string): Promise<void> {
   for (const a of Object.values(p.assets)) await add(a.id, a.name, "media");
   for (const f of Object.values(p.fonts ?? {}))
     await add(f.id, f.family, "fonts");
+  for (const l of Object.values(p.luts ?? {})) await add(l.id, l.name, "luts");
 
   const manifest: Manifest = {
     format: FORMAT,
@@ -264,7 +265,7 @@ export async function openProjectFile(file: File): Promise<boolean> {
   // Files first, so the project never points at something not stored yet.
   const failed: string[] = [];
   for (const e of entries) {
-    const m = /^(media|fonts)\/(.+)$/.exec(e.name);
+    const m = /^(media|fonts|luts)\/(.+)$/.exec(e.name);
     if (!m?.[2]) continue;
     const fileId = m[2];
     const info = manifest.files?.[fileId];

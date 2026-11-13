@@ -8,6 +8,7 @@ import {
   type ResolvedEffects,
   resolveEffects,
 } from "./effects.ts";
+import type { LayerLut } from "./lut.ts";
 import { type Property, valueAt } from "./property.ts";
 import type { Micros } from "./time.ts";
 
@@ -61,6 +62,8 @@ export interface DrawStyle extends ResolvedEffects {
   blend: BlendMode;
   /** Null when every adjustment is 0, so the renderer can skip colour work. */
   adjust: Record<AdjustKey, number> | null;
+  /** Project LUT to apply after the adjustments, and how strongly (0 to 1). */
+  lut: { id: string; intensity: number } | null;
 }
 
 export function resolveStyle(
@@ -69,6 +72,7 @@ export function resolveStyle(
     blend?: BlendMode;
     effects?: Effects;
     mask?: Mask;
+    lut?: LayerLut;
   },
   local: Micros,
   shortSide: number,
@@ -76,6 +80,15 @@ export function resolveStyle(
   return {
     blend: layer.blend ?? "normal",
     adjust: resolveAdjust(layer.adjust, local),
+    lut: layer.lut
+      ? {
+          id: layer.lut.id,
+          intensity: Math.min(
+            1,
+            Math.max(0, valueAt(layer.lut.intensity, local)),
+          ),
+        }
+      : null,
     ...resolveEffects(layer, local, shortSide),
   };
 }

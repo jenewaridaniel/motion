@@ -161,6 +161,17 @@ function checkLayer(l: unknown, p: Obj): string | null {
       return `${where} has an invalid mask`;
     }
   }
+  if (l.lut !== undefined) {
+    if (
+      !isObj(l.lut) ||
+      !isStr(l.lut.id) ||
+      !isProperty(l.lut.intensity, isNum)
+    ) {
+      return `${where} has an invalid LUT`;
+    }
+    if (!isObj(p.luts) || !(l.lut.id in p.luts))
+      return `${where} uses a missing LUT`;
+  }
   if (l.adjust !== undefined) {
     if (!isObj(l.adjust)) return `${where} has invalid adjustments`;
     for (const [k, v] of Object.entries(l.adjust)) {
@@ -253,6 +264,15 @@ export function parseProject(raw: unknown): ParseResult {
     for (const [id, f] of Object.entries(raw.fonts)) {
       if (!isObj(f) || f.id !== id || !isStr(f.family) || !isStr(f.fileName)) {
         return { ok: false, reason: `font ${id} is invalid` };
+      }
+    }
+  }
+  if (raw.luts !== undefined) {
+    if (!isObj(raw.luts))
+      return { ok: false, reason: "its LUT list is invalid" };
+    for (const [id, f] of Object.entries(raw.luts)) {
+      if (!isObj(f) || f.id !== id || !isStr(f.name) || !isStr(f.fileName)) {
+        return { ok: false, reason: `LUT ${id} is invalid` };
       }
     }
   }

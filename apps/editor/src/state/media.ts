@@ -19,6 +19,7 @@ import {
 } from "@motion/media";
 import { DEFAULT_FONT } from "../lib/fonts.ts";
 import { importFonts, isFontFile } from "./customFonts.ts";
+import { importLuts, isLutFile } from "./luts.ts";
 import { isProjectFile, openProjectFile } from "./projects.ts";
 import { loadMedia, saveMedia } from "./storage.ts";
 import { useEditor } from "./store.ts";
@@ -29,7 +30,7 @@ const handles = new Map<string, MediaHandle>();
 export const getHandle = (assetId: string) => handles.get(assetId);
 
 export const ACCEPT =
-  "video/*,audio/*,image/*,.mov,.mkv,.m4a,.mp3,.wav,.flac,.ogg,.srt,.vtt,.ttf,.otf,.woff,.woff2,.motion";
+  "video/*,audio/*,image/*,.mov,.mkv,.m4a,.mp3,.wav,.flac,.ogg,.srt,.vtt,.ttf,.otf,.woff,.woff2,.motion,.cube";
 
 /** Preset closest in shape to `w × h`. */
 function nearestAspect(w: number, h: number): AspectKey {
@@ -89,6 +90,10 @@ export async function importFiles(files: Iterable<File>): Promise<void> {
         }
         if (isFontFile(file)) {
           await importFonts([file]);
+          continue;
+        }
+        if (isLutFile(file)) {
+          await importLuts([file]);
           continue;
         }
         if (isProjectFile(file)) {

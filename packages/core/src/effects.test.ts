@@ -54,6 +54,7 @@ describe("effects", () => {
     expect(drawAt(p, 1).style).toEqual({
       blend: "normal",
       adjust: null,
+      lut: null,
       blur: 0,
       key: null,
       mask: null,

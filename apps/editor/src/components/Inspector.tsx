@@ -30,6 +30,7 @@ import type { ReactNode } from "react";
 import { useEditor, useSelectedLayer } from "../state/store.ts";
 import { EffectsInspector } from "./EffectsInspector.tsx";
 import { Diamond } from "./icons.tsx";
+import { LutControl } from "./LutControl.tsx";
 import { NumberField } from "./NumberField.tsx";
 import { TextInspector } from "./TextInspector.tsx";
 
@@ -367,6 +368,7 @@ function LayerInspector({ layer }: { layer: Layer }) {
             </select>
             <span className="size-7 shrink-0" />
           </div>
+          <LutControl layer={layer} at={at} set={set} kfButton={kfButton} />
         </Section>
       )}
 

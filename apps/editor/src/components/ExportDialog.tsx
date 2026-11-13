@@ -15,6 +15,7 @@ import {
 } from "@motion/media";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { engine } from "../lib/engine.ts";
+import { lutTables } from "../state/luts.ts";
 import { getHandle } from "../state/media.ts";
 import { useEditor } from "../state/store.ts";
 import { CloseIcon } from "./icons.tsx";
@@ -189,6 +190,7 @@ function Dialog() {
           });
         },
         ctrl.signal,
+        lutTables,
       );
       let url: string | null = null;
       if (result.blob) {

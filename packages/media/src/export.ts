@@ -1,4 +1,5 @@
 import {
+  type CubeLut,
   collectAudioSegments,
   type ExportQualityLevel,
   evaluateFrame,
@@ -108,6 +109,8 @@ export async function exportProject(
   dest: ExportDestination,
   onProgress: (p: ExportProgress) => void,
   signal?: AbortSignal,
+  /** Project LUTs by id (the same ones the preview uses). */
+  luts?: ReadonlyMap<string, CubeLut>,
 ): Promise<ExportResult> {
   const notes: string[] = [];
   const duration = projectDuration(project);
@@ -193,6 +196,7 @@ export async function exportProject(
         compWidth: comp.width,
         compHeight: comp.height,
         background: comp.background,
+        luts,
       });
       await videoSource.add(t / US, 1 / fps);
       // Keep audio a chunk ahead of video so the muxer can interleave.

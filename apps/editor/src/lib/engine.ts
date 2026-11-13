@@ -10,6 +10,7 @@ import {
 } from "@motion/core";
 import { AudioPreview, FrameProvider } from "@motion/media";
 import { Compositor } from "@motion/renderer";
+import { lutTables } from "../state/luts.ts";
 import { getHandle } from "../state/media.ts";
 import { useEditor } from "../state/store.ts";
 
@@ -113,6 +114,7 @@ class Engine {
         compWidth: comp.width,
         compHeight: comp.height,
         background: comp.background,
+        luts: lutTables,
       });
       // Remember what is on screen and where, for clicking and dragging.
       const rects = new Map<string, Rect>();

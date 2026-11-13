@@ -10,6 +10,7 @@ import {
   type MaskShape,
 } from "./effects.ts";
 import { ADJUST_KEYS, type AdjustKey, type BlendMode, LOOKS } from "./look.ts";
+import type { LutAsset } from "./lut.ts";
 import {
   ASPECTS,
   type AspectKey,
@@ -79,6 +80,29 @@ function fits(track: Track, start: Micros, duration: Micros, except?: Id) {
 
 export function addAsset(p: Project, asset: Asset): void {
   p.assets[asset.id] = asset;
+}
+
+export function addLut(p: Project, lut: LutAsset): void {
+  if (!p.luts) p.luts = {};
+  p.luts[lut.id] = lut;
+}
+
+/** Use a project LUT on a layer (full strength), or null to remove it. */
+export function setLayerLut(
+  p: Project,
+  layerId: Id,
+  lutId: Id | null,
+): boolean {
+  const loc = findLayer(p, layerId);
+  if (!loc) return false;
+  if (!lutId) {
+    delete loc.layer.lut;
+    return true;
+  }
+  if (!p.luts?.[lutId]) return false;
+  if (loc.layer.lut) loc.layer.lut.id = lutId;
+  else loc.layer.lut = { id: lutId, intensity: prop(1) };
+  return true;
 }
 
 export function addFont(p: Project, font: FontAsset): void {
@@ -432,7 +456,8 @@ export type PropertyPath =
   | "effects.glitch.amount"
   | "effects.shake.amount"
   | `effects.vignette.${"amount" | "size"}`
-  | `mask.${"center" | "size" | "rotation" | "feather"}`;
+  | `mask.${"center" | "size" | "rotation" | "feather"}`
+  | "lut.intensity";
 
 export function getProperty(
   layer: Layer,
@@ -451,6 +476,9 @@ export function getProperty(
       return layer.opacity;
     case "volume":
       return layer.kind === "media" ? layer.volume : null;
+  }
+  if (path === "lut.intensity") {
+    return (layer.lut?.intensity as Property<Animatable> | undefined) ?? null;
   }
   if (path.startsWith("adjust.")) {
     const key = path.slice("adjust.".length) as AdjustKey;
@@ -517,6 +545,7 @@ function forEachProperty(
       fn(p as Property<Animatable>);
     }
   }
+  if (layer.lut) fn(layer.lut.intensity as Property<Animatable>);
 }
 
 /** Set a value at composition time `at`. Keyframes it if the property is animated. */

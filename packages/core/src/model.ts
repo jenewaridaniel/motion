@@ -1,5 +1,6 @@
 import type { Effects, Mask } from "./effects.ts";
 import type { Adjustments, BlendMode } from "./look.ts";
+import type { LayerLut, LutAsset } from "./lut.ts";
 import { type Property, prop, type Vec2 } from "./property.ts";
 import { type Micros, sec } from "./time.ts";
 
@@ -58,6 +59,8 @@ interface LayerBase {
   blend?: BlendMode;
   effects?: Effects;
   mask?: Mask;
+  /** A colour lookup table from the project's LUTs. */
+  lut?: LayerLut;
 }
 
 export interface MediaLayer extends LayerBase {
@@ -205,6 +208,8 @@ export interface Project {
   assets: Record<Id, Asset>;
   /** Fonts the user added. Missing in projects saved before this existed. */
   fonts?: Record<Id, FontAsset>;
+  /** LUT files the user added (.cube). */
+  luts?: Record<Id, LutAsset>;
   compositions: Record<Id, Composition>;
   rootCompositionId: Id;
 }

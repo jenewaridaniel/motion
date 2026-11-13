@@ -59,6 +59,12 @@ Planned layer kinds, which slot into the same union: `shape` (paths, strokes, tr
 
 `core/canvas.ts` hit-tests draws (topmost rectangle under a point, following rotation and scale) and turns a drag into a position change in the parent's space. The engine keeps the last frame's draws and rectangles; `CanvasOverlay` sits over the preview for select, drag, centre snapping and the selection outline.
 
+## Colour, effects and LUTs
+
+- **Model:** every layer can have `adjust` (colour sliders), `blend`, `effects` (blur, chromaKey, glitch, shake, vignette), `mask` and `lut` (`{ id, intensity }`). Numbers are `Property` values, so they animate. LUT files are `Project.luts` entries; the file is stored in the `media` store by LUT id, like fonts.
+- **Resolving:** `core.resolveStyle` turns them into plain numbers for one moment (`VisualDraw.style`). Shake changes the layer's matrix instead.
+- **Drawing:** one fragment shader, in this order: glitch (shifted sampling), green screen, colour adjustments, LUT, mask, vignette. Blur runs first as a separate two-pass Gaussian into textures (at lower resolution for big blurs). Blend modes are GPU blend functions. The LUT is a 3D half-float texture on texture unit 1. The editor keeps parsed LUTs in `state/luts.ts` and passes them to both the preview and export (`RenderInput.luts`), so they match.
+
 ## Edits and undo
 
 Every change goes through `History.apply(project, recipe, mergeKey?)`. That uses Immer's `produceWithPatches` and stores forward and inverse patches. Dragging and scrubbing pass a `mergeKey`, so one whole gesture is one undo step. Edit functions in `core/edit.ts` take absolute targets (for example "trim the end to 4.2 s") instead of deltas, so repeating them during a drag is safe.
@@ -80,8 +86,8 @@ Every change goes through `History.apply(project, recipe, mergeKey?)`. That uses
 ## Not built yet (in order)
 
 1. Export in a worker, only if measured stutter on weaker devices calls for it. Export already stays smooth on a Mac (see project-notes). Web Audio isn't available in workers, so audio mixing would stay on the main thread and stream chunks to the worker.
-2. Project file import/export (to move a project between devices) and a project list.
-3. Render-to-texture in the compositor: nested-comp clipping, group opacity, effects, masks, blend modes, transitions.
-4. Text and shape layers, the graph editor, motion paths on the canvas.
+2. Render-to-texture for whole compositions: nested-comp clipping and group opacity. (Effects, masks, blend modes and LUTs work per layer already.)
+3. Transitions (Phase 3, stage D).
+4. Shape layers (Phase 3, stage F), the graph editor, motion paths on the canvas.
 5. Device-adaptive export presets, proxies, ProRes (WASM).
 6. PWA install (vite-plugin-pwa).

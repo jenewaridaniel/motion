@@ -230,6 +230,26 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** the real save dialog (a stand-in caught the file; the system dialog can't be driven from here); projects over 4 GB for real (ZIP64 tested with a forced small limit); Safari and Firefox (Safari has no save dialog, so it downloads); a second tab trying to manage projects (it's refused with a message, by design, but not exercised).
 - Known limits: media from projects you switched away from stays open in memory until reload; saving a big project reads every file once to checksum it (takes a while for many GB).
 
+### Phase 3, stage A: colour, looks and blend modes (2026-11-13)
+
+- Built: a Color section for every video, photo and text clip. Ten adjustments (exposure, brightness, contrast, saturation, vibrance, warmth, tint, highlights, shadows, fade), all with keyframes. Ten one-tap looks (Original, Vivid, Warm, Cool, Punch, Film, Moody, Dreamy, Mono, Noir) that just set those sliders. Blend modes: Normal, Multiply, Screen, Add, Lighten. Logic in `core/look.ts`; the GPU shader does the maths, so preview and export match.
+- Tested by hand: 7 reference frames with no colour changes are pixel-identical to before (nothing else changed). Every adjustment and blend mode compared against an independent JavaScript version of the formula: 0 difference. In the editor: Mono look, typing exposure, contrast keyframes, Screen blend, reload keeps them, export of a Mono clip has 0 colourful pixels.
+- **Not tested:** HDR or 10-bit sources; how the looks feel on real footage (they were checked for correctness, not taste).
+
+### Phase 3, stage B: effects and masks (2026-11-13)
+
+- Built: per-clip effects with keyframes: Blur, Green screen (key colour, a screen colour picker in Chrome and Edge, strength, edges, spill), Glitch, Shake (amount and speed), Vignette. Masks: Rectangle, Ellipse, Line, with position, size, rotation, feather and invert. Logic in `core/effects.ts`.
+- Tested by hand: reference frames still identical. Blur within 1 colour level of an exact Gaussian at two strengths. Green screen removes green and keeps red. Each mask shape and invert checked by reading pixels inside, outside and at the edge. Vignette: corner 52 vs centre 255. Glitch gives the same picture every time at the same moment (so export matches preview). In the editor: turning each effect on and off, reload, export (masked centre in colour, corner black).
+- **Not tested:** speed of heavy blur on 4K exports or on a phone; green screen on real (unevenly lit) footage.
+
+### Phase 3, stage C: LUTs (2026-11-13)
+
+- Built: import `.cube` LUT files (the 3D kind that colour packs, Resolve and Premiere use) through Import, drag-and-drop, or a clip's Color section (LUT menu, "Add .cube file…"). Each clip can use one LUT with a Strength (0 to 100%, with keyframes). LUTs are stored on the device, come back after reload, travel inside `.motion` files, and are kept by the file cleanup. A LUT that can't be loaded gives a message; adding the same file again reconnects it. Parsing in `core/lut.ts` (with tests); the GPU applies it after green screen and colour adjustments.
+- Tested by hand (test copy on port 5181): reference frames still identical. Pixel checks against the expected result on a real video frame: identity LUT changes nothing (0 difference), invert LUT exact on every pixel, a 33-point red/blue swap exact, 50% strength gives exactly the midpoint. In the editor: a broken `.cube` is refused with "The LUT should have 8 colours, found 2" and nothing is added; adding invert.cube from the Color section applies it to the selected clip; typing 50 into Strength; reload (LUT restored, preview grey as expected); export (the LUT clip is flat grey within 1 level, the next clip keeps its colours); "None" removes it, undo brings it back, redo removes it; file cleanup keeps the LUT file; a `.motion` file contains the LUT and, after deleting the stored copy, opening the file brings it back; with the stored copy deleted, the missing-LUT message appears and importing the same file reconnects it (no duplicate).
+- Bug found and fixed: **every LUT drew black.** WebGL refuses to upload raw numbers into a 3D texture while "premultiply alpha" is on, and the compositor turns that on for photos and video. Found by the pixel check; the upload now switches it off for the LUT only. There is no automated renderer test (WebGL needs a browser), so the check lives in the browser test only.
+- **Not tested:** the export dialog's own button (I called the same export function with the same LUT list it passes); real commercial LUT packs (only LUTs I generated); LUTs with a custom input range on real files (parsed and tested in core, not seen on screen); 65-point LUTs for speed; Safari and Firefox.
+- Known limits: LUTs can't be removed from a project once added (they're small); one LUT per clip.
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
@@ -237,6 +257,7 @@ Agreed order (Phase 2 next):
 2. ~~Thumbnails and waveforms on clips.~~ Done.
 3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
 4. ~~A project list~~ Done. **Phase 2 is complete** (only the real-phone test is left, and needs the user).
-Then Phase 3 (transitions, filters and color, effects, audio tools, stickers, templates) and Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
+Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. Next: D. transitions, E. audio tools (fades, voiceover, sound effects, extract audio), F. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
+Then Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

@@ -7,6 +7,7 @@
  */
 import { type Project, parseProject } from "@motion/core";
 import { restoreFonts } from "./customFonts.ts";
+import { restoreLuts } from "./luts.ts";
 import { restoreMedia } from "./media.ts";
 import {
   canSave,
@@ -86,13 +87,20 @@ export async function adoptStoredProject(
   const parsed = parseProject(raw);
   if (!parsed.ok) return parsed.reason;
   const store = useEditor.getState();
-  const [missing, missingFonts] = await Promise.all([
+  const [missing, missingFonts, missingLuts] = await Promise.all([
     restoreMedia(Object.values(parsed.project.assets)),
     restoreFonts(Object.values(parsed.project.fonts ?? {})),
+    restoreLuts(Object.values(parsed.project.luts ?? {})),
   ]);
   store.loadProject(parsed.project);
   lastSaved = parsed.project;
   if (savedAt) markSaved(savedAt);
+  if (missingLuts.length > 0) {
+    store.toast(
+      `The LUT${missingLuts.length > 1 ? "s" : ""} ${missingLuts.join(", ")} couldn't be loaded, so ${missingLuts.length > 1 ? "they're" : "it's"} skipped. Add the .cube file again to fix it.`,
+      "error",
+    );
+  }
   if (missingFonts.length > 0) {
     store.toast(
       `The font${missingFonts.length > 1 ? "s" : ""} ${missingFonts.join(", ")} couldn't be loaded, so that text uses a standard font. Add the font file again to fix it.`,
