@@ -3,8 +3,10 @@ import {
   type AspectKey,
   type Asset,
   addAsset,
+  addCaptions,
   appendAsset,
   isSameMedia,
+  parseCaptions,
   projectDuration,
   setAspect,
 } from "@motion/core";
@@ -15,6 +17,7 @@ import {
   reopenFile,
   UnsupportedMediaError,
 } from "@motion/media";
+import { DEFAULT_FONT } from "../lib/fonts.ts";
 import { loadMedia, saveMedia } from "./storage.ts";
 import { useEditor } from "./store.ts";
 
@@ -24,7 +27,7 @@ const handles = new Map<string, MediaHandle>();
 export const getHandle = (assetId: string) => handles.get(assetId);
 
 export const ACCEPT =
-  "video/*,audio/*,image/*,.mov,.mkv,.m4a,.mp3,.wav,.flac,.ogg";
+  "video/*,audio/*,image/*,.mov,.mkv,.m4a,.mp3,.wav,.flac,.ogg,.srt,.vtt";
 
 /** Preset closest in shape to `w × h`. */
 function nearestAspect(w: number, h: number): AspectKey {
@@ -44,6 +47,23 @@ function nearestAspect(w: number, h: number): AspectKey {
   return best;
 }
 
+const isCaptionFile = (f: File) =>
+  /\.(srt|vtt)$/i.test(f.name) || f.type === "text/vtt";
+
+/** Turn a subtitle file into text clips. Nothing is stored but the text. */
+async function importCaptions(file: File): Promise<void> {
+  const { edit, toast } = useEditor.getState();
+  const cues = parseCaptions(await file.text());
+  if (cues.length === 0) {
+    toast(`${file.name} has no captions we could read.`, "error");
+    return;
+  }
+  edit((d) => void addCaptions(d, cues, { font: DEFAULT_FONT.family }));
+  toast(
+    `Added ${cues.length} caption${cues.length === 1 ? "" : "s"} from ${file.name}.`,
+  );
+}
+
 /**
  * Probe files and add them to the timeline. The first visual clip on an
  * empty timeline sets the canvas shape, like CapCut's "Original".
@@ -61,6 +81,10 @@ export async function importFiles(files: Iterable<File>): Promise<void> {
   try {
     for (const file of list) {
       try {
+        if (isCaptionFile(file)) {
+          await importCaptions(file);
+          continue;
+        }
         const { asset, handle } = await probeFile(file);
         const { project, edit, playhead } = useEditor.getState();
 

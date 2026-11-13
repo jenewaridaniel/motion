@@ -1,4 +1,5 @@
 export * from "./canvas.ts";
+export * from "./captions.ts";
 export * from "./edit.ts";
 export * from "./evaluate.ts";
 export * from "./export-quality.ts";

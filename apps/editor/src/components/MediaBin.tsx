@@ -115,7 +115,7 @@ export function MediaBin() {
         )}
         {list.length === 0 && importing === 0 && (
           <li className="px-2 py-6 text-center text-ink-faint leading-relaxed">
-            Import videos, photos or music.
+            Import videos, photos, music or captions (.srt).
             <br />
             Files stay on your device.
           </li>
