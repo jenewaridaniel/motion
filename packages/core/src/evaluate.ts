@@ -17,14 +17,18 @@ import {
   type TextStyle,
 } from "./model.ts";
 import { type Property, valueAt } from "./property.ts";
+import { textAnimationAt } from "./text-animation.ts";
 import type { Micros } from "./time.ts";
 
 /** What a draw shows. File sources are in pixels from their top-left corner. */
 export type DrawSource =
   | { kind: "video"; assetId: Id; time: Micros; width: number; height: number }
   | { kind: "image"; assetId: Id; width: number; height: number }
-  /** Laid out by whoever draws it; layer space is centred on the text block. */
-  | { kind: "text"; text: string; style: TextStyle };
+  /**
+   * Laid out by whoever draws it; layer space is centred on the text block.
+   * `reveal` (0 to 1) shows only that share of the letters, in reading order.
+   */
+  | { kind: "text"; text: string; style: TextStyle; reveal?: number };
 
 /** One thing to draw. Everything the renderer needs, nothing it has to look up. */
 export interface VisualDraw {
@@ -117,12 +121,33 @@ function drawComposition(
       }
       if (layer.kind === "text") {
         if (layer.text.trim() === "") continue;
+        const anim = textAnimationAt(layer, local);
+        const shown = opacity * anim.opacity;
+        if (shown <= 0) continue;
+        // Animation scales and rotates around the anchor, and offsets in the
+        // layer's own space so a slide follows the text's rotation.
+        const [ax, ay] = valueAt(layer.transform.anchor, local);
+        const extra = multiply(
+          multiply(
+            multiply(
+              translate(ax + anim.dx, ay + anim.dy),
+              rotate(anim.rotation),
+            ),
+            scale(anim.scale, anim.scale),
+          ),
+          translate(-ax, -ay),
+        );
         out.push({
           key,
           layerId: layer.id,
-          source: { kind: "text", text: layer.text, style: layer.style },
-          matrix,
-          opacity,
+          source: {
+            kind: "text",
+            text: layer.text,
+            style: layer.style,
+            ...(anim.reveal < 1 ? { reveal: anim.reveal } : {}),
+          },
+          matrix: multiply(matrix, extra),
+          opacity: shown,
         });
         continue;
       }

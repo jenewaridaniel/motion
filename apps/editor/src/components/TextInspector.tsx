@@ -1,8 +1,15 @@
 import {
+  sec,
   setText,
+  setTextAnimation,
   setTextStyle,
+  TEXT_IN_ANIMATIONS,
+  TEXT_LOOP_ANIMATIONS,
+  TEXT_OUT_ANIMATIONS,
+  type TextAnimation,
   type TextLayer,
   type TextStyle,
+  US,
 } from "@motion/core";
 import { type ReactNode, useId, useRef } from "react";
 import { clampWeight, FONTS, fontByFamily } from "../lib/fonts.ts";
@@ -320,6 +327,7 @@ export function TextInspector({ layer }: { layer: TextLayer }) {
           </>
         )}
       </Extra>
+      <AnimationControls layer={layer} />
     </section>
   );
 }
@@ -437,5 +445,135 @@ function AlignGlyph({ align }: { align: "left" | "center" | "right" }) {
         );
       })}
     </svg>
+  );
+}
+
+const ANIMATION_LABELS: Record<string, string> = {
+  fade: "Fade",
+  pop: "Pop",
+  "slide-up": "Slide up",
+  "slide-down": "Slide down",
+  typewriter: "Typewriter",
+  pulse: "Pulse",
+  float: "Float",
+  wiggle: "Wiggle",
+};
+
+const DEFAULT_DURATION = sec(0.5);
+const DEFAULT_PERIOD = sec(1.5);
+
+/** Ready-made in, out and loop motion for a text clip. */
+function AnimationControls({ layer }: { layer: TextLayer }) {
+  const edit = useEditor((s) => s.edit);
+  const seal = useEditor((s) => s.seal);
+  const a: TextAnimation = layer.animation ?? {
+    in: null,
+    out: null,
+    loop: null,
+  };
+  const patch = (p: Partial<TextAnimation>, gesture?: string) =>
+    edit((d) => void setTextAnimation(d, layer.id, p), gesture);
+
+  const select = (
+    label: string,
+    value: string | undefined,
+    kinds: readonly string[],
+    onPick: (kind: string | null) => void,
+  ) => (
+    <select
+      aria-label={`${label} animation`}
+      value={value ?? ""}
+      onChange={(e) => onPick(e.target.value || null)}
+      className="h-7 min-w-0 flex-1 rounded-md bg-panel-2 px-1.5 text-ink outline-none focus:ring-1 focus:ring-flare"
+    >
+      <option value="">None</option>
+      {kinds.map((k) => (
+        <option key={k} value={k}>
+          {ANIMATION_LABELS[k] ?? k}
+        </option>
+      ))}
+    </select>
+  );
+
+  const seconds = (
+    label: string,
+    value: number,
+    onChange: (v: number, g: string) => void,
+  ) => (
+    <NumberField
+      label={label}
+      value={value / US}
+      min={0.1}
+      max={10}
+      step={0.1}
+      precision={1}
+      unit="s"
+      onChange={(v, g) => onChange(sec(v), g)}
+      onCommit={seal}
+    />
+  );
+
+  return (
+    <div className="mt-3">
+      <h4 className="mb-1 font-semibold text-[11px] text-ink-soft">
+        Animation
+      </h4>
+      <div className="flex flex-col gap-1">
+        <Row label="In">
+          {select("In", a.in?.kind, TEXT_IN_ANIMATIONS, (kind) =>
+            patch({
+              in: kind
+                ? {
+                    kind: kind as never,
+                    duration: a.in?.duration ?? DEFAULT_DURATION,
+                  }
+                : null,
+            }),
+          )}
+        </Row>
+        {a.in &&
+          seconds(
+            "Length",
+            a.in.duration,
+            (d, g) => a.in && patch({ in: { ...a.in, duration: d } }, g),
+          )}
+        <Row label="Out">
+          {select("Out", a.out?.kind, TEXT_OUT_ANIMATIONS, (kind) =>
+            patch({
+              out: kind
+                ? {
+                    kind: kind as never,
+                    duration: a.out?.duration ?? DEFAULT_DURATION,
+                  }
+                : null,
+            }),
+          )}
+        </Row>
+        {a.out &&
+          seconds(
+            "Length",
+            a.out.duration,
+            (d, g) => a.out && patch({ out: { ...a.out, duration: d } }, g),
+          )}
+        <Row label="Loop">
+          {select("Loop", a.loop?.kind, TEXT_LOOP_ANIMATIONS, (kind) =>
+            patch({
+              loop: kind
+                ? {
+                    kind: kind as never,
+                    period: a.loop?.period ?? DEFAULT_PERIOD,
+                  }
+                : null,
+            }),
+          )}
+        </Row>
+        {a.loop &&
+          seconds(
+            "Cycle",
+            a.loop.period,
+            (d, g) => a.loop && patch({ loop: { ...a.loop, period: d } }, g),
+          )}
+      </div>
+    </div>
   );
 }

@@ -7,4 +7,5 @@ export * from "./matrix.ts";
 export * from "./model.ts";
 export * from "./property.ts";
 export * from "./serialize.ts";
+export * from "./text-animation.ts";
 export * from "./time.ts";

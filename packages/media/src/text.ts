@@ -97,10 +97,16 @@ export class TextRasterizer {
     text: string,
     style: TextStyle,
     pixelRatio: number,
+    /** Share of letters to show, 0 to 1 (typewriter). Layout stays the same. */
+    reveal = 1,
   ): Promise<PlacedImage | null> {
     if (text.trim() === "") return null;
+    // Count letters (code points, so emoji and accents count once), not newlines.
+    const total = Array.from(text.replace(/\n/g, "")).length;
+    const visible = reveal >= 1 ? total : Math.round(reveal * total);
+    if (visible <= 0) return null;
     const ratio = pixelRatioStep(pixelRatio);
-    const key = JSON.stringify([text, style, ratio]);
+    const key = JSON.stringify([text, style, ratio, visible]);
     const hit = this.cache.get(key);
     if (hit) {
       // Keep recently used images at the end, so they're evicted last.
@@ -169,6 +175,14 @@ export class TextRasterizer {
     ctx.textAlign = "left";
     ctx.lineJoin = "round";
     const top = -m.height / 2;
+    // The visible start of each line (all of it unless typing out).
+    let left = visible;
+    const shownLines = m.lines.map((line) => {
+      const chars = Array.from(line);
+      const part = chars.slice(0, Math.max(0, left)).join("");
+      left -= chars.length;
+      return part;
+    });
     const lineX = (w: number) =>
       style.align === "left"
         ? -m.width / 2
@@ -181,7 +195,7 @@ export class TextRasterizer {
       ctx.strokeStyle = style.stroke.color;
       // Twice as wide, because the fill covers the inner half.
       ctx.lineWidth = style.stroke.width * 2;
-      m.lines.forEach((line, i) => {
+      shownLines.forEach((line, i) => {
         ctx.strokeText(
           line,
           lineX(m.widths[i] ?? 0),
@@ -194,7 +208,7 @@ export class TextRasterizer {
 
     if (!shadowUsed) shadowOn();
     ctx.fillStyle = style.color;
-    m.lines.forEach((line, i) => {
+    shownLines.forEach((line, i) => {
       ctx.fillText(
         line,
         lineX(m.widths[i] ?? 0),

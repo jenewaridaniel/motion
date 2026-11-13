@@ -22,6 +22,7 @@ import {
   newId,
   type Project,
   rootComposition,
+  type TextAnimation,
   type TextLayer,
   type TextStyle,
   type Track,
@@ -184,6 +185,20 @@ export function setText(p: Project, layerId: Id, text: string): boolean {
   return true;
 }
 
+export function setTextAnimation(
+  p: Project,
+  layerId: Id,
+  patch: Partial<TextAnimation>,
+): boolean {
+  const layer = findText(p, layerId);
+  if (!layer) return false;
+  layer.animation = {
+    ...(layer.animation ?? { in: null, out: null, loop: null }),
+    ...patch,
+  };
+  return true;
+}
+
 export function setTextStyle(
   p: Project,
   layerId: Id,
@@ -337,6 +352,14 @@ export function splitLayer(p: Project, layerId: Id, at: Micros): Id | null {
   right.duration = layer.duration - local;
   if (hasSource(right) && hasSource(layer)) {
     right.inPoint = layer.inPoint + Math.round(local * layer.speed);
+  }
+  // The entrance stays at the start and the exit at the end, so nothing
+  // animates at the cut.
+  if (right.kind === "text" && right.animation) {
+    right.animation.in = null;
+  }
+  if (layer.kind === "text" && layer.animation) {
+    layer.animation.out = null;
   }
   // Shift keyframes so both halves keep exactly the same animation.
   forEachProperty(right, (prop) => shiftKeyframes(prop, -local));

@@ -93,6 +93,45 @@ export interface TextStyle {
   box: { color: string; padding: number; radius: number } | null;
 }
 
+export type TextInAnimation =
+  | "fade"
+  | "pop"
+  | "slide-up"
+  | "slide-down"
+  | "typewriter";
+export type TextOutAnimation = "fade" | "pop" | "slide-up" | "slide-down";
+export type TextLoopAnimation = "pulse" | "float" | "wiggle";
+
+/**
+ * Ready-made motion, worked out from the clip's own timing at draw time, so
+ * trimming moves the "out" with the end. Combines with keyframes.
+ */
+export interface TextAnimation {
+  in: { kind: TextInAnimation; duration: Micros } | null;
+  out: { kind: TextOutAnimation; duration: Micros } | null;
+  /** One cycle every `period`. */
+  loop: { kind: TextLoopAnimation; period: Micros } | null;
+}
+
+export const TEXT_IN_ANIMATIONS: TextInAnimation[] = [
+  "fade",
+  "pop",
+  "slide-up",
+  "slide-down",
+  "typewriter",
+];
+export const TEXT_OUT_ANIMATIONS: TextOutAnimation[] = [
+  "fade",
+  "pop",
+  "slide-up",
+  "slide-down",
+];
+export const TEXT_LOOP_ANIMATIONS: TextLoopAnimation[] = [
+  "pulse",
+  "float",
+  "wiggle",
+];
+
 /**
  * Text. Its layer space has the origin at the middle of the text block, so
  * the default anchor (0, 0) rotates and scales it around its centre.
@@ -101,6 +140,8 @@ export interface TextLayer extends LayerBase {
   kind: "text";
   text: string;
   style: TextStyle;
+  /** Missing in projects saved before animations existed. */
+  animation?: TextAnimation;
 }
 
 export type Layer = MediaLayer | CompositionLayer | TextLayer;

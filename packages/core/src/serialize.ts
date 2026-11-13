@@ -4,7 +4,13 @@
  * Loading a broken project would crash the editor, so every saved project
  * goes through `parseProject` first.
  */
-import type { Asset, Project } from "./model.ts";
+import {
+  type Asset,
+  type Project,
+  TEXT_IN_ANIMATIONS,
+  TEXT_LOOP_ANIMATIONS,
+  TEXT_OUT_ANIMATIONS,
+} from "./model.ts";
 
 /** The project format this build reads and writes. */
 export const PROJECT_VERSION = 1;
@@ -79,6 +85,23 @@ function checkTextStyle(s: unknown): boolean {
   );
 }
 
+function checkTextAnimation(a: unknown): boolean {
+  const part = (v: unknown, kinds: readonly string[], field: string) =>
+    isNullOr(
+      v,
+      (o) =>
+        kinds.includes(o.kind as string) &&
+        isNum(o[field]) &&
+        (o[field] as number) >= 0,
+    );
+  return (
+    isObj(a) &&
+    part(a.in, TEXT_IN_ANIMATIONS, "duration") &&
+    part(a.out, TEXT_OUT_ANIMATIONS, "duration") &&
+    part(a.loop, TEXT_LOOP_ANIMATIONS, "period")
+  );
+}
+
 function checkLayer(l: unknown, p: Obj): string | null {
   if (!isObj(l) || !isStr(l.id)) return "a layer has no id";
   const where = `layer ${l.id}`;
@@ -98,9 +121,11 @@ function checkLayer(l: unknown, p: Obj): string | null {
   if (!isProperty(l.opacity, isNum)) return `${where} has invalid opacity`;
   if (l.kind === "text") {
     if (!isStr(l.text)) return `${where} has no text`;
-    return checkTextStyle(l.style)
-      ? null
-      : `${where} has an invalid text style`;
+    if (!checkTextStyle(l.style)) return `${where} has an invalid text style`;
+    if (l.animation !== undefined && !checkTextAnimation(l.animation)) {
+      return `${where} has an invalid text animation`;
+    }
+    return null;
   }
   if (!isNum(l.inPoint) || !isNum(l.speed) || l.speed <= 0) {
     return `${where} has an invalid in-point or speed`;

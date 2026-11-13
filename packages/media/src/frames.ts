@@ -124,6 +124,7 @@ export class FrameProvider {
             src.text,
             src.style,
             layerToOutputScale(d, outputScale),
+            src.reveal,
           );
           if (img) out.set(d.key, img);
           return;
