@@ -135,3 +135,30 @@ export function snapRotation(degrees: number): number {
   const nearest = Math.round(degrees / 45) * 45;
   return Math.abs(degrees - nearest) <= ROTATE_SNAP ? nearest : degrees;
 }
+
+/** Size of the handles on the preview, in screen pixels. */
+export interface HandleSizes {
+  /** Invisible grab area of each handle. */
+  target: number;
+  /** The square or dot you see. */
+  visible: number;
+  /** How far the rotate handle sits beyond the top edge. */
+  rotateOffset: number;
+}
+
+/**
+ * Handle sizes for a selection whose shortest side is `side` screen pixels.
+ * Touch gets 44 px targets (the usual minimum for fingers), a mouse 24 px.
+ * On small selections the targets shrink (never under 16 px) so the middle
+ * stays free for dragging the clip itself.
+ */
+export function handleSizes(touch: boolean, side: number): HandleSizes {
+  const base = touch ? 44 : 24;
+  const target = Math.max(16, Math.min(base, side * 0.4));
+  return {
+    target,
+    visible: touch ? 12 : 9,
+    // Far enough that the rotate target never overlaps the corner targets.
+    rotateOffset: target + 4,
+  };
+}

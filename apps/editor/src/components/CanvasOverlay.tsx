@@ -3,6 +3,7 @@ import {
   apply,
   dragPosition,
   findLayer,
+  handleSizes,
   layerHitTest,
   parentMatrixAt,
   rectCorners,
@@ -26,6 +27,10 @@ import { useEditor } from "../state/store.ts";
 const SNAP_PX = 8;
 
 let gesture = 0;
+
+const hasTouchScreen = () =>
+  typeof matchMedia !== "undefined" &&
+  matchMedia("(any-pointer: coarse)").matches;
 
 /** Corners in the order `rectCorners` gives them. */
 const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
@@ -82,6 +87,9 @@ export function CanvasOverlay({
   const [hovering, setHovering] = useState(false);
   const drag = useRef<Drag | null>(null);
   const handleDrag = useRef<HandleDrag | null>(null);
+  // Finger-sized handles on touch screens, or once a finger has been used.
+  const [touchUsed, setTouchUsed] = useState(false);
+  const touch = touchUsed || hasTouchScreen();
   const playing = useEditor((s) => s.playing);
 
   // Screen pixels per canvas pixel.
@@ -105,6 +113,16 @@ export function CanvasOverlay({
           ([x, y]) => [x * k, y * k] as [number, number],
         )
       : null;
+  // Shortest side of the selection on screen, for sizing the handles.
+  const side = corners
+    ? Math.min(
+        ...corners.map(([x, y], i) => {
+          const [nx, ny] = corners[(i + 1) % 4] as [number, number];
+          return Math.hypot(nx - x, ny - y);
+        }),
+      )
+    : 0;
+  const sizes = handleSizes(touch, side);
   const rotateHandle = (() => {
     if (!corners) return null;
     const [a, b, c, d] = corners as [
@@ -119,7 +137,7 @@ export function CanvasOverlay({
       (a[1] + b[1] + c[1] + d[1]) / 4,
     ];
     const len = Math.hypot(top[0] - mid[0], top[1] - mid[1]) || 1;
-    const out = 26;
+    const out = sizes.rotateOffset;
     return {
       from: top,
       at: [
@@ -133,6 +151,7 @@ export function CanvasOverlay({
     e: ReactPointerEvent<SVGElement>,
     mode: HandleDrag["mode"],
   ) => {
+    if (e.pointerType === "touch") setTouchUsed(true);
     if (e.button !== 0 || !selected) return;
     e.stopPropagation();
     const s = useEditor.getState();
@@ -184,6 +203,7 @@ export function CanvasOverlay({
   };
 
   const onDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "touch") setTouchUsed(true);
     if (e.button !== 0) return;
     const [x, y] = toCanvas(e);
     const { draws, rects } = engine.lastFrame;
@@ -327,7 +347,7 @@ export function CanvasOverlay({
             data-handle="rotate"
             cx={rotateHandle.at[0]}
             cy={rotateHandle.at[1]}
-            r={14}
+            r={sizes.target / 2}
             fill="transparent"
             style={{ cursor: "grab" }}
             onPointerDown={(e) => startHandle(e, "rotate")}
@@ -335,7 +355,7 @@ export function CanvasOverlay({
           <circle
             cx={rotateHandle.at[0]}
             cy={rotateHandle.at[1]}
-            r={5}
+            r={sizes.visible / 2}
             fill="var(--color-ink)"
             stroke="var(--color-flare)"
             strokeWidth={1.5}
@@ -345,19 +365,19 @@ export function CanvasOverlay({
             <g key={CORNER_NAMES[i]}>
               <rect
                 data-handle={`scale-${i}`}
-                x={x - 12}
-                y={y - 12}
-                width={24}
-                height={24}
+                x={x - sizes.target / 2}
+                y={y - sizes.target / 2}
+                width={sizes.target}
+                height={sizes.target}
                 fill="transparent"
                 style={{ cursor: i % 2 === 0 ? "nwse-resize" : "nesw-resize" }}
                 onPointerDown={(e) => startHandle(e, "scale")}
               />
               <rect
-                x={x - 4.5}
-                y={y - 4.5}
-                width={9}
-                height={9}
+                x={x - sizes.visible / 2}
+                y={y - sizes.visible / 2}
+                width={sizes.visible}
+                height={sizes.visible}
                 rx={1.5}
                 fill="var(--color-ink)"
                 stroke="var(--color-flare)"

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { angleStep, scaleFromHandle, snapRotation } from "./canvas.ts";
+import {
+  angleStep,
+  handleSizes,
+  scaleFromHandle,
+  snapRotation,
+} from "./canvas.ts";
 import { addCaptions } from "./captions.ts";
 import {
   addText,
@@ -45,6 +50,22 @@ describe("canvas handles", () => {
       prev = next;
     }
     expect(total).toBeCloseTo(360, 6);
+  });
+
+  it("handles are finger-sized on touch, and leave small clips draggable", () => {
+    expect(handleSizes(true, 500).target).toBe(44);
+    expect(handleSizes(false, 500).target).toBe(24);
+    // A 60 px clip: targets shrink to 40% of it so its middle stays free.
+    expect(handleSizes(true, 60).target).toBe(24);
+    // Never smaller than 16 px.
+    expect(handleSizes(true, 10).target).toBe(16);
+    // The rotate handle is always clear of the corner targets.
+    for (const touch of [true, false]) {
+      for (const side of [10, 60, 500]) {
+        const h = handleSizes(touch, side);
+        expect(h.rotateOffset).toBeGreaterThan(h.target);
+      }
+    }
   });
 
   it("snaps to 45° steps only when close", () => {
