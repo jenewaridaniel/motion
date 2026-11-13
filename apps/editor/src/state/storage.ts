@@ -252,10 +252,14 @@ export async function pruneMedia(): Promise<number> {
       if (!c) return;
       // Read asset ids even from projects that fail to load, so their files
       // are kept in case they can be recovered later.
-      const assets = (c.value as { project?: { assets?: unknown } })?.project
-        ?.assets;
-      if (assets && typeof assets === "object") {
-        for (const id of Object.keys(assets)) used.add(id);
+      const project = (
+        c.value as { project?: { assets?: unknown; fonts?: unknown } }
+      )?.project;
+      // Imported media and added font files both live in the media store.
+      for (const list of [project?.assets, project?.fonts]) {
+        if (list && typeof list === "object") {
+          for (const id of Object.keys(list)) used.add(id);
+        }
       }
       c.continue();
     };

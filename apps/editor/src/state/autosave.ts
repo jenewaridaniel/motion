@@ -6,6 +6,7 @@
  * newer one. Only one tab saves at a time; see `claimTab`.
  */
 import { type Project, parseProject } from "@motion/core";
+import { restoreFonts } from "./customFonts.ts";
 import { restoreMedia } from "./media.ts";
 import {
   canSave,
@@ -100,12 +101,19 @@ export async function startAutosave(): Promise<void> {
     if (raw !== null) {
       const parsed = parseProject(raw.project);
       if (parsed.ok) {
-        const missing = await restoreMedia(
-          Object.values(parsed.project.assets),
-        );
+        const [missing, missingFonts] = await Promise.all([
+          restoreMedia(Object.values(parsed.project.assets)),
+          restoreFonts(Object.values(parsed.project.fonts ?? {})),
+        ]);
         store.loadProject(parsed.project);
         lastSaved = parsed.project;
         if (raw.savedAt) markSaved(raw.savedAt);
+        if (missingFonts.length > 0) {
+          store.toast(
+            `The font${missingFonts.length > 1 ? "s" : ""} ${missingFonts.join(", ")} couldn't be loaded, so that text uses a standard font. Add the font file again to fix it.`,
+            "error",
+          );
+        }
         if (missing.length > 0) {
           store.toast(
             `${missing.join(", ")} couldn't be reopened. Import ${missing.length > 1 ? "them" : "it"} again to see ${missing.length > 1 ? "them" : "it"}.`,

@@ -12,6 +12,7 @@ import {
   createMediaLayer,
   createTextLayer,
   createTrack,
+  type FontAsset,
   findLayer,
   findTrack,
   hasSource,
@@ -70,6 +71,11 @@ function fits(track: Track, start: Micros, duration: Micros, except?: Id) {
 
 export function addAsset(p: Project, asset: Asset): void {
   p.assets[asset.id] = asset;
+}
+
+export function addFont(p: Project, font: FontAsset): void {
+  if (!p.fonts) p.fonts = {};
+  p.fonts[font.id] = font;
 }
 
 function mainTrack(comp: Composition): Track {

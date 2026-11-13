@@ -197,6 +197,15 @@ export function parseProject(raw: unknown): ParseResult {
   if (!isObj(raw.assets) || !isObj(raw.compositions)) {
     return { ok: false, reason: "it has no assets or compositions" };
   }
+  if (raw.fonts !== undefined) {
+    if (!isObj(raw.fonts))
+      return { ok: false, reason: "its font list is invalid" };
+    for (const [id, f] of Object.entries(raw.fonts)) {
+      if (!isObj(f) || f.id !== id || !isStr(f.family) || !isStr(f.fileName)) {
+        return { ok: false, reason: `font ${id} is invalid` };
+      }
+    }
+  }
   for (const [id, a] of Object.entries(raw.assets)) {
     const err = checkAsset(a, id);
     if (err) return { ok: false, reason: err };

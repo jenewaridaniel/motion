@@ -191,6 +191,20 @@ My notes:
 - **Not tested:** Safari and Firefox; fonts with non-Latin scripts (Arabic, Chinese, etc.); emoji; very long text.
 - Not built (could come next): dragging text directly on the preview, text animation presets (in/out/loop), captions from SRT.
 
+### Text follow-ups (2026-11-13)
+
+Tested in a separate test copy on port 5181 (its own storage), because the user was working in 5180 at the same time.
+
+- **Slow first seek (investigated, no code change):** the ~0.6 s came mostly from the test clips, which have one keyframe at 0 s. Phone-like footage (keyframe every second): 25 to 125 ms per seek. Jumping back to a clip restarts its decoder (+25 to 50 ms); keeping decoders alive would cost ~32 MB each at 1080p, so not done. Files with rare keyframes need proxies (Phase 4).
+- **Drag on the preview:** click selects the topmost clip under the pointer, drag moves it, the centre snaps to the canvas centre lines (Alt skips), one undo per drag, an animated position gets a keyframe. Parented layers move in their parent's space. Tested: select, outline, drag with snap, sideways drag, undo, select video, drag animated text.
+- **Text animations:** In (fade, pop, slide up/down, typewriter), Out (fade, pop, slide up/down), Loop (pulse, float, wiggle). Worked out at draw time from the clip's timing, on top of keyframes. Tested in preview, after reload and in an export.
+- **Captions from SRT/VTT:** import or drop a .srt/.vtt file; one outlined text clip per cue on a Captions track, overlaps on extra tracks, one undo step. Tested with a messy SRT (CRLF, BOM, tags, broken entry) and a junk file.
+- **Fonts:** 36 bundled fonts (OFL or Apache 2.0), generated from their packages by `apps/editor/scripts/gen-fonts.mjs` (`pnpm --filter editor gen:fonts`), grouped Sans / Display / Serif / Handwritten / Mono. Plus "add your own font" (.ttf, .otf, .woff, .woff2), stored on the device with the project, reconnected when re-added after going missing. Tested: all 36 load, UI font width axis intact, upload applies to the selected text, reload, export uses it, fake font refused, missing font message and reconnect.
+- Bugs found and fixed on the way: re-adding a missing font file would have created a duplicate ("… 2") instead of fixing the text; text drawn in a fallback font stayed cached after the real font arrived.
+- Size: fonts add 9.8 MB to the deployed files (396 files) but each person downloads only the fonts they use; the CSS everyone loads grew from 29 KB to 191 KB (about 20 KB compressed).
+- **Not tested:** Safari, Firefox; fonts that don't cover a language's letters (they fall back to a standard font); very large font files; caption files with thousands of cues; dragging on touch screens.
+- Not built: changing the style of all captions at once, resize/rotate handles on the preview, editing caption timing in bulk.
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):

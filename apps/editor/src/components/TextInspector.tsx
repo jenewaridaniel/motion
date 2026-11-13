@@ -12,8 +12,17 @@ import {
   US,
 } from "@motion/core";
 import { type ReactNode, useId, useRef } from "react";
-import { clampWeight, FONTS, fontByFamily } from "../lib/fonts.ts";
+import {
+  clampWeight,
+  customFonts,
+  FONT_GROUPS,
+  FONTS,
+  fontByFamily,
+  YOUR_FONTS,
+} from "../lib/fonts.ts";
+import { FONT_ACCEPT, importFonts } from "../state/customFonts.ts";
 import { useEditor } from "../state/store.ts";
+import { PlusIcon } from "./icons.tsx";
 import { NumberField } from "./NumberField.tsx";
 
 const WEIGHTS = [
@@ -31,7 +40,10 @@ export function TextInspector({ layer }: { layer: TextLayer }) {
   const edit = useEditor((s) => s.edit);
   const seal = useEditor((s) => s.seal);
   const style = layer.style;
-  const font = fontByFamily(style.font);
+  const project = useEditor((s) => s.project);
+  const mine = customFonts(project);
+  const font = fontByFamily(style.font, project);
+  const fontInput = useRef<HTMLInputElement>(null);
   // One undo step per typing session in the text box.
   const typing = useRef(`text-${++session}`);
   const textId = useId();
@@ -67,7 +79,7 @@ export function TextInspector({ layer }: { layer: TextLayer }) {
             aria-label="Font"
             value={style.font}
             onChange={(e) => {
-              const next = fontByFamily(e.target.value);
+              const next = fontByFamily(e.target.value, project);
               if (!next) return;
               patch({
                 font: next.family,
@@ -78,12 +90,47 @@ export function TextInspector({ layer }: { layer: TextLayer }) {
             className="h-7 min-w-0 flex-1 rounded-md bg-panel-2 px-1.5 text-ink outline-none focus:ring-1 focus:ring-flare"
           >
             {!font && <option value={style.font}>{style.font}</option>}
-            {FONTS.map((f) => (
-              <option key={f.family} value={f.family}>
-                {f.label}
-              </option>
+            {mine.length > 0 && (
+              <optgroup label={YOUR_FONTS}>
+                {mine.map((f) => (
+                  <option key={f.family} value={f.family}>
+                    {f.label}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {FONT_GROUPS.map((g) => (
+              <optgroup key={g} label={g}>
+                {FONTS.filter((f) => f.group === g).map((f) => (
+                  <option key={f.family} value={f.family}>
+                    {f.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
+          <button
+            type="button"
+            title="Add your own font file (.ttf, .otf, .woff)"
+            aria-label="Add your own font"
+            onClick={() => fontInput.current?.click()}
+            className="grid size-7 shrink-0 place-items-center rounded-md bg-panel-2 text-ink-soft transition-colors hover:text-ink"
+          >
+            <PlusIcon width={13} height={13} />
+          </button>
+          <input
+            ref={fontInput}
+            type="file"
+            accept={FONT_ACCEPT}
+            hidden
+            onChange={async (e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = "";
+              const [family] = await importFonts(files);
+              // Use the new font on this text straight away.
+              if (family) patch({ font: family, italic: false });
+            }}
+          />
         </Row>
         <Row label="Weight">
           <select

@@ -168,6 +168,11 @@ export class FrameProvider {
     return out;
   }
 
+  /** Redraw text from scratch next time (fonts changed). */
+  clearTextCache(): void {
+    this.text.clear();
+  }
+
   /** Start decoding upcoming draws so cuts don't stall. Fire and forget. */
   warm(draws: VisualDraw[]): void {
     for (const d of draws) {

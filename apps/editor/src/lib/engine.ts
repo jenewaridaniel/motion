@@ -39,6 +39,10 @@ class Engine {
   constructor() {
     // Redraw when the project or playhead changes while paused.
     useEditor.subscribe((s, prev) => {
+      if (s.mediaVersion !== prev.mediaVersion) {
+        // A file or font came back: text drawn in a fallback font is stale.
+        this.frames.clearTextCache();
+      }
       if (s.project !== prev.project || s.mediaVersion !== prev.mediaVersion) {
         if (s.playing) this.restartAudio(this.audio.time);
         this.request(s.playhead);

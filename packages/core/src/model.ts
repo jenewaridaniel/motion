@@ -178,11 +178,21 @@ export interface Composition {
   tracks: Track[];
 }
 
+/** A font file the user added. The file itself is stored outside the model. */
+export interface FontAsset {
+  id: Id;
+  /** The name text clips use in `style.font`. Unique in the project. */
+  family: string;
+  fileName: string;
+}
+
 export interface Project {
   version: 1;
   id: Id;
   name: string;
   assets: Record<Id, Asset>;
+  /** Fonts the user added. Missing in projects saved before this existed. */
+  fonts?: Record<Id, FontAsset>;
   compositions: Record<Id, Composition>;
   rootCompositionId: Id;
 }

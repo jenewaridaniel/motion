@@ -87,6 +87,12 @@ function layout(ctx: Canvas2D, text: string, style: TextStyle) {
 export class TextRasterizer {
   private cache = new Map<string, PlacedImage>();
   private cachedPixels = 0;
+
+  /** Forget every image, e.g. after a font was added or reconnected. */
+  clear(): void {
+    this.cache.clear();
+    this.cachedPixels = 0;
+  }
   private measure: Canvas2D | null = null;
 
   /**

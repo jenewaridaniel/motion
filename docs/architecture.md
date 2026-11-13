@@ -51,7 +51,13 @@ Planned layer kinds, which slot into the same union: `shape` (paths, strokes, tr
 
 - **Model:** `TextLayer` holds the words and a `TextStyle` (font, weight, italic, size, color, alignment, line height, letter spacing, optional outline, shadow and background box). Transform and opacity animate like any layer. Text has no source time, so it trims freely and has no sound.
 - **Drawing:** `evaluateFrame` returns draws whose `source` is `video`, `image` or `text`. `media.TextRasterizer` draws text with Canvas 2D at the size it will appear (layer scale x output scale, rounded to quarter-octave steps), caches the result (LRU, 64 megapixels max) and hands the compositor a `PlacedImage` centred on the layer origin. Same path for preview and export, so 4K exports get 4K-sharp text.
-- **Fonts:** bundled with the editor (`apps/editor/src/lib/fonts.ts`, all SIL OFL), loaded only when used. Core's default is generic `sans-serif`; the editor passes its default (Archivo).
+- **Animations:** `TextLayer.animation` (in / out / loop presets). `core.textAnimationAt` turns them into opacity, scale, offset, rotation and a letter `reveal` at draw time; `evaluateFrame` applies them around the anchor, on top of keyframes. Split keeps "in" on the left and "out" on the right.
+- **Captions:** `core.parseCaptions` (SRT, WebVTT) and `core.addCaptions` (text clips near the bottom, overlaps on extra tracks).
+- **Fonts:** 36 bundled fonts (OFL or Apache 2.0), listed in `apps/editor/src/lib/fonts.generated.ts`, which `scripts/gen-fonts.mjs` builds from the font packages. Each downloads only when used. Users' own fonts are `Project.fonts` entries; the file is stored in the `media` store by font id and registered with `FontFace` on load. Core's default is generic `sans-serif`; the editor passes its default (Archivo).
+
+## Working on the canvas
+
+`core/canvas.ts` hit-tests draws (topmost rectangle under a point, following rotation and scale) and turns a drag into a position change in the parent's space. The engine keeps the last frame's draws and rectangles; `CanvasOverlay` sits over the preview for select, drag, centre snapping and the selection outline.
 
 ## Edits and undo
 
