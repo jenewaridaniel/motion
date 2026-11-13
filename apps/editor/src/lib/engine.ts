@@ -72,8 +72,10 @@ class Engine {
       const draws = evaluateFrame(project, t);
       const upcoming = evaluateFrame(project, t + LOOKAHEAD);
       this.frames.warm(upcoming);
+      const canvasW = compositor.canvas.width;
       const images = await this.frames.images(
         draws,
+        canvasW / rootComposition(project).width,
         upcoming.map((d) => d.key),
       );
       // The project may have changed while decoding; re-evaluate cheaply.

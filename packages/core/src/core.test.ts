@@ -12,7 +12,11 @@ import {
   toggleKeyframe,
   trimLayer,
 } from "./edit.ts";
-import { collectAudioSegments, evaluateFrame } from "./evaluate.ts";
+import {
+  collectAudioSegments,
+  evaluateFrame,
+  type VisualDraw,
+} from "./evaluate.ts";
 import { History } from "./history.ts";
 import { apply } from "./matrix.ts";
 import {
@@ -44,6 +48,11 @@ function setup(...assets: Asset[]) {
   });
   return { history, p };
 }
+
+const videoTime = (d: VisualDraw) =>
+  d.source.kind === "video" ? d.source.time : null;
+const assetOf = (d: VisualDraw) =>
+  d.source.kind === "text" ? null : d.source.assetId;
 
 const main = (p: Project) => rootComposition(p).tracks.find((t) => t.magnetic)!;
 const layers = (p: Project) => main(p).layers;
@@ -171,7 +180,7 @@ describe("trim and split", () => {
     const right = layers(p)[1]!;
     expect(right.kind === "media" && right.inPoint).toBe(sec(4));
     expect(evaluateFrame(p, sec(7))[0]!.opacity).toBeCloseTo(before, 6);
-    expect(evaluateFrame(p, sec(7))[0]!.sourceTime).toBe(sec(7));
+    expect(videoTime(evaluateFrame(p, sec(7))[0]!)).toBe(sec(7));
   });
 
   it("speed changes duration and source mapping", () => {
@@ -184,7 +193,7 @@ describe("trim and split", () => {
       setSpeed(d, id, 2);
     });
     expect(layers(p)[0]!.duration).toBe(sec(5));
-    expect(evaluateFrame(p, sec(1))[0]!.sourceTime).toBe(sec(2));
+    expect(videoTime(evaluateFrame(p, sec(1))[0]!)).toBe(sec(2));
   });
 });
 
@@ -195,8 +204,8 @@ describe("evaluation", () => {
       appendAsset(d, "a");
       addOverlay(d, "b", sec(1));
     });
-    expect(evaluateFrame(p, sec(0.5)).map((d) => d.assetId)).toEqual(["a"]);
-    expect(evaluateFrame(p, sec(2)).map((d) => d.assetId)).toEqual(["a", "b"]);
+    expect(evaluateFrame(p, sec(0.5)).map(assetOf)).toEqual(["a"]);
+    expect(evaluateFrame(p, sec(2)).map(assetOf)).toEqual(["a", "b"]);
   });
 
   it("fits media to the canvas by default", () => {

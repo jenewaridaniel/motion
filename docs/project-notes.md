@@ -182,10 +182,19 @@ My notes:
 - **Export in a worker: not built, on purpose.** Measured during export: 4K60 single clip, 75 screen updates/s, worst pause 14 ms. Four stacked layers at 4K60, 69 updates/s, 3 pauses (worst 160 ms) in 6.4 s. Not worth the cost now: Web Audio (used to mix export audio, same as preview) isn't available in workers, so a worker needs a second audio path. Re-measure on phones and weak laptops.
 - **Not tested:** export quality on Windows/Linux, Safari, Firefox; real camera footage (only synthetic test clips).
 
+### Phase 2, step 1: text (2026-11-13)
+
+- Built: "Text" button in the timeline adds a text clip at the playhead on a text track (reused when there is room). Inspector Text section: words (multi-line), 7 bundled fonts, weight, italic (where the font has it), size, color, alignment, line height, letter spacing, outline, shadow, background box. Moves, scales, rotates, fades and keyframes like any clip; trims, splits, undo, autosave, export.
+- Tested by hand in Chrome (full reloads, state read through `window.__motion`): add text; type two lines (one undo step for the whole typing); font, color, outline, background box, alignment through the real controls; scale keyframes (40% → 100% pop-in); split; trim the end past 3 s and a blocked start trim; reload → identical; export at 1080p (text pixels present while on screen, none after); 4K export sharpness (blurry-edge ratio 0.45 of 1080p, i.e. drawn at 4K); all 7 fonts load; empty text draws nothing; 9:16 switch keeps a centred caption centred; 300% scale stays sharp; text cache stays under its memory limit.
+- Bugs found and fixed: the clip color class collided with Tailwind's `bg-clip-text` utility (clip looked black); text-only tracks showed a pointless mute button.
+- Noticed, not changed: the first seek after a reload takes ~0.6 s while the video decoder starts.
+- **Not tested:** Safari and Firefox; fonts with non-Latin scripts (Arabic, Chinese, etc.); emoji; very long text.
+- Not built (could come next): dragging text directly on the preview, text animation presets (in/out/loop), captions from SRT.
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
-1. Text layers.
+1. ~~Text layers.~~ Done.
 2. Thumbnails and waveforms on clips.
 3. Phone layout and touch timeline (the editor shows a "coming next" notice on phones). Re-measure export smoothness there.
 4. A project list ("New project", open older projects), project file import/export.

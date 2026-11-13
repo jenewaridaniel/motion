@@ -25,6 +25,7 @@
   --color-clip-main: oklch(0.52 0.1 350);
   --color-clip-overlay: oklch(0.52 0.1 305);
   --color-clip-audio: oklch(0.52 0.1 165);
+  --color-clip-title: oklch(0.52 0.1 70);
 
   --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);

@@ -14,23 +14,25 @@ import {
   layerEnd,
   type MediaLayer,
   type Project,
+  type TextStyle,
 } from "./model.ts";
 import { type Property, valueAt } from "./property.ts";
 import type { Micros } from "./time.ts";
+
+/** What a draw shows. File sources are in pixels from their top-left corner. */
+export type DrawSource =
+  | { kind: "video"; assetId: Id; time: Micros; width: number; height: number }
+  | { kind: "image"; assetId: Id; width: number; height: number }
+  /** Laid out by whoever draws it; layer space is centred on the text block. */
+  | { kind: "text"; text: string; style: TextStyle };
 
 /** One thing to draw. Everything the renderer needs, nothing it has to look up. */
 export interface VisualDraw {
   /** The root-level layer (or nested layer) this draw came from. Stable across frames. */
   key: string;
   layerId: Id;
-  assetId: Id;
-  assetKind: "video" | "image";
-  /** Source time to show, for video. */
-  sourceTime: Micros;
-  /** Source size in pixels. */
-  width: number;
-  height: number;
-  /** Source pixels to root-composition pixels. */
+  source: DrawSource;
+  /** Layer space to root-composition pixels. */
   matrix: Affine;
   opacity: number;
 }
@@ -113,23 +115,34 @@ function drawComposition(
         );
         continue;
       }
+      if (layer.kind === "text") {
+        if (layer.text.trim() === "") continue;
+        out.push({
+          key,
+          layerId: layer.id,
+          source: { kind: "text", text: layer.text, style: layer.style },
+          matrix,
+          opacity,
+        });
+        continue;
+      }
       const asset = p.assets[layer.assetId];
       if (!asset || asset.kind === "audio" || !asset.hasVideo) continue;
-      const raw = layer.inPoint + Math.round(local * layer.speed);
-      out.push({
-        key,
-        layerId: layer.id,
-        assetId: asset.id,
-        assetKind: asset.kind,
-        sourceTime:
-          asset.kind === "video"
-            ? Math.min(raw, Math.max(0, asset.duration - 1))
-            : 0,
-        width: asset.width,
-        height: asset.height,
-        matrix,
-        opacity,
-      });
+      const { width, height } = asset;
+      const source: DrawSource =
+        asset.kind === "video"
+          ? {
+              kind: "video",
+              assetId: asset.id,
+              time: Math.min(
+                layer.inPoint + Math.round(local * layer.speed),
+                Math.max(0, asset.duration - 1),
+              ),
+              width,
+              height,
+            }
+          : { kind: "image", assetId: asset.id, width, height };
+      out.push({ key, layerId: layer.id, source, matrix, opacity });
     }
   }
 }

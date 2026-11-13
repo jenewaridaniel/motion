@@ -71,7 +71,45 @@ export interface CompositionLayer extends LayerBase {
   speed: number;
 }
 
-export type Layer = MediaLayer | CompositionLayer;
+export interface TextStyle {
+  /** Font family name. The editor decides which fonts are offered. */
+  font: string;
+  /** 100 to 900. */
+  weight: number;
+  italic: boolean;
+  /** Font size in layer pixels, before the layer's scale. */
+  size: number;
+  /** CSS hex, e.g. "#ffffff". */
+  color: string;
+  align: "left" | "center" | "right";
+  /** Multiple of the font size. */
+  lineHeight: number;
+  /** Extra space between letters, in layer pixels. */
+  letterSpacing: number;
+  /** Outline around each letter. */
+  stroke: { color: string; width: number } | null;
+  shadow: { color: string; blur: number; x: number; y: number } | null;
+  /** A filled box behind the text, like a caption label. */
+  box: { color: string; padding: number; radius: number } | null;
+}
+
+/**
+ * Text. Its layer space has the origin at the middle of the text block, so
+ * the default anchor (0, 0) rotates and scales it around its centre.
+ */
+export interface TextLayer extends LayerBase {
+  kind: "text";
+  text: string;
+  style: TextStyle;
+}
+
+export type Layer = MediaLayer | CompositionLayer | TextLayer;
+
+/** Layers that play part of a source (a file or a nested composition). */
+export type SourceLayer = MediaLayer | CompositionLayer;
+
+export const hasSource = (l: Layer): l is SourceLayer =>
+  l.kind === "media" || l.kind === "composition";
 
 // ---------------------------------------------------------------- tracks
 
@@ -186,6 +224,62 @@ export function fittedTransform(
 }
 
 export const DEFAULT_IMAGE_DURATION = sec(5);
+export const DEFAULT_TEXT_DURATION = sec(3);
+
+/** White, bold, centred, with a soft shadow so it reads on any footage. */
+export function defaultTextStyle(
+  comp: Pick<Composition, "width" | "height">,
+): TextStyle {
+  return {
+    // Generic, so core needs no font files. The editor passes its own default.
+    font: "sans-serif",
+    weight: 800,
+    italic: false,
+    // About 7.5% of the short side: 81 px on a 1080-wide canvas.
+    size: Math.round(Math.min(comp.width, comp.height) * 0.075),
+    color: "#ffffff",
+    align: "center",
+    lineHeight: 1.15,
+    letterSpacing: 0,
+    stroke: null,
+    shadow: { color: "#000000", blur: 12, x: 0, y: 4 },
+    box: null,
+  };
+}
+
+/** The clip name for some text: its first non-empty line, shortened. */
+export function textLayerName(text: string): string {
+  const line = text
+    .split("\n")
+    .map((s) => s.trim())
+    .find((s) => s.length > 0);
+  if (!line) return "Text";
+  return line.length > 40 ? `${line.slice(0, 39)}…` : line;
+}
+
+export function createTextLayer(
+  comp: Pick<Composition, "width" | "height">,
+  start: Micros,
+  text = "Your text",
+  style: Partial<TextStyle> = {},
+): TextLayer {
+  return {
+    id: newId(),
+    kind: "text",
+    name: textLayerName(text),
+    start,
+    duration: DEFAULT_TEXT_DURATION,
+    transform: {
+      anchor: prop<Vec2>([0, 0]),
+      position: prop<Vec2>([comp.width / 2, comp.height / 2]),
+      scale: prop<Vec2>([1, 1]),
+      rotation: prop(0),
+    },
+    opacity: prop(1),
+    text,
+    style: { ...defaultTextStyle(comp), ...style },
+  };
+}
 
 export function createMediaLayer(
   asset: Asset,
@@ -256,6 +350,7 @@ export function findTrack(
 
 /** Longest the layer can last given its source and speed. */
 export function maxLayerDuration(p: Project, layer: Layer): Micros {
+  if (layer.kind === "text") return Number.POSITIVE_INFINITY;
   if (layer.kind === "media") {
     const asset = p.assets[layer.assetId];
     if (!asset || asset.kind === "image") return Number.POSITIVE_INFINITY;

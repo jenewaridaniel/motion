@@ -48,6 +48,37 @@ function checkAsset(a: unknown, id: string): string | null {
   return null;
 }
 
+const isColor = (v: unknown) => isStr(v) && /^#[0-9a-f]{6}$/i.test(v);
+
+/** Optional parts of a text style are either null or a complete object. */
+function isNullOr(v: unknown, check: (o: Obj) => boolean): boolean {
+  return v === null || (isObj(v) && check(v));
+}
+
+function checkTextStyle(s: unknown): boolean {
+  return (
+    isObj(s) &&
+    isStr(s.font) &&
+    isNum(s.weight) &&
+    typeof s.italic === "boolean" &&
+    isNum(s.size) &&
+    s.size > 0 &&
+    isColor(s.color) &&
+    ["left", "center", "right"].includes(s.align as string) &&
+    isNum(s.lineHeight) &&
+    isNum(s.letterSpacing) &&
+    isNullOr(s.stroke, (o) => isColor(o.color) && isNum(o.width)) &&
+    isNullOr(
+      s.shadow,
+      (o) => isColor(o.color) && isNum(o.blur) && isNum(o.x) && isNum(o.y),
+    ) &&
+    isNullOr(
+      s.box,
+      (o) => isColor(o.color) && isNum(o.padding) && isNum(o.radius),
+    )
+  );
+}
+
 function checkLayer(l: unknown, p: Obj): string | null {
   if (!isObj(l) || !isStr(l.id)) return "a layer has no id";
   const where = `layer ${l.id}`;
@@ -65,6 +96,12 @@ function checkLayer(l: unknown, p: Obj): string | null {
     return `${where} has an invalid transform`;
   }
   if (!isProperty(l.opacity, isNum)) return `${where} has invalid opacity`;
+  if (l.kind === "text") {
+    if (!isStr(l.text)) return `${where} has no text`;
+    return checkTextStyle(l.style)
+      ? null
+      : `${where} has an invalid text style`;
+  }
   if (!isNum(l.inPoint) || !isNum(l.speed) || l.speed <= 0) {
     return `${where} has an invalid in-point or speed`;
   }

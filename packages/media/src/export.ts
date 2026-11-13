@@ -186,7 +186,7 @@ export async function exportProject(
       abortIfNeeded();
       const t = frameTime(i, fps);
       const draws = evaluateFrame(project, t);
-      const images = await frames.images(draws);
+      const images = await frames.images(draws, width / comp.width);
       compositor.render({
         draws,
         images,

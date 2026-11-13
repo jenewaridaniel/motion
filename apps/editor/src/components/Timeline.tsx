@@ -1,5 +1,6 @@
 import {
   type Asset,
+  addText,
   deleteLayer,
   formatSeconds,
   type Id,
@@ -26,6 +27,7 @@ import {
   useState,
 } from "react";
 import { engine } from "../lib/engine.ts";
+import { DEFAULT_FONT } from "../lib/fonts.ts";
 import { ACCEPT, importFiles } from "../state/media.ts";
 import { useEditor } from "../state/store.ts";
 import {
@@ -37,6 +39,7 @@ import {
   RedoIcon,
   SpeakerIcon,
   SplitIcon,
+  TextIcon,
   TrashIcon,
   UndoIcon,
   VideoIcon,
@@ -77,6 +80,18 @@ export function splitAtPlayhead() {
   });
   // Like CapCut: keep working on the part after the cut.
   if (right) s.select(right);
+}
+
+/** Add a text clip at the playhead and select it, ready to type. */
+export function addTextAtPlayhead() {
+  const s = useEditor.getState();
+  let id: Id | null = null;
+  s.edit((d) => {
+    id = addText(d, s.playhead, {
+      style: { font: DEFAULT_FONT.family, weight: 800 },
+    });
+  });
+  if (id) s.select(id);
 }
 
 export function deleteSelection() {
@@ -200,6 +215,16 @@ export function Timeline() {
         >
           <LayersIcon />
         </IconButton>
+        <div className="mx-1 h-5 w-px bg-line" />
+        <button
+          type="button"
+          onClick={addTextAtPlayhead}
+          title="Add text at the playhead"
+          className="flex h-8 items-center gap-1.5 rounded-md px-2.5 font-semibold text-[12px] text-ink-soft transition-colors hover:bg-raised hover:text-ink"
+        >
+          <TextIcon width={14} height={14} />
+          Text
+        </button>
         <div className="ml-auto flex items-center gap-2">
           <IconButton
             label="Fit timeline"
@@ -422,23 +447,26 @@ function TrackRow({
             <EyeIcon off={track.hidden} width={14} height={14} />
           </button>
         )}
-        <button
-          type="button"
-          title={track.muted ? "Unmute track" : "Mute track"}
-          aria-label={track.muted ? "Unmute track" : "Mute track"}
-          aria-pressed={track.muted}
-          onClick={() =>
-            edit((d) => {
-              const t = rootComposition(d).tracks.find(
-                (x) => x.id === track.id,
-              );
-              if (t) t.muted = !t.muted;
-            })
-          }
-          className="grid size-6 place-items-center rounded text-ink-faint hover:bg-raised hover:text-ink"
-        >
-          <SpeakerIcon off={track.muted} width={14} height={14} />
-        </button>
+        {/* Text has no sound, so a track of only text gets no mute button. */}
+        {!track.layers.every((l) => l.kind === "text") && (
+          <button
+            type="button"
+            title={track.muted ? "Unmute track" : "Mute track"}
+            aria-label={track.muted ? "Unmute track" : "Mute track"}
+            aria-pressed={track.muted}
+            onClick={() =>
+              edit((d) => {
+                const t = rootComposition(d).tracks.find(
+                  (x) => x.id === track.id,
+                );
+                if (t) t.muted = !t.muted;
+              })
+            }
+            className="grid size-6 place-items-center rounded text-ink-faint hover:bg-raised hover:text-ink"
+          >
+            <SpeakerIcon off={track.muted} width={14} height={14} />
+          </button>
+        )}
       </div>
       <div
         className="relative"
@@ -536,11 +564,13 @@ function Clip({
   const w = Math.max(4, (layer.duration / US) * pps);
 
   const color =
-    track.kind === "audio"
-      ? "bg-clip-audio"
-      : track.magnetic
-        ? "bg-clip-main"
-        : "bg-clip-overlay";
+    layer.kind === "text"
+      ? "bg-clip-title"
+      : track.kind === "audio"
+        ? "bg-clip-audio"
+        : track.magnetic
+          ? "bg-clip-main"
+          : "bg-clip-overlay";
 
   const keyframeTimes = useMemo(() => {
     if (!selected) return [];
@@ -651,11 +681,13 @@ function Clip({
   };
 
   const Icon =
-    asset?.kind === "image"
-      ? ImageIcon
-      : asset?.kind === "audio"
-        ? MusicIcon
-        : VideoIcon;
+    layer.kind === "text"
+      ? TextIcon
+      : asset?.kind === "image"
+        ? ImageIcon
+        : asset?.kind === "audio"
+          ? MusicIcon
+          : VideoIcon;
   const speed =
     layer.kind === "media" && layer.speed !== 1
       ? `${+layer.speed.toFixed(2)}×`

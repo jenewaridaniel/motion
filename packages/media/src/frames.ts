@@ -1,11 +1,12 @@
 import { US, type VisualDraw } from "@motion/core";
-import type { FrameImage } from "@motion/renderer";
+import type { PlacedImage } from "@motion/renderer";
 import {
   CanvasSink,
   type InputVideoTrack,
   type WrappedCanvas,
 } from "mediabunny";
 import type { MediaHandle } from "./probe.ts";
+import { TextRasterizer } from "./text.ts";
 
 /**
  * Frame access for one timeline layer. Walks forward through the decoder
@@ -74,46 +75,88 @@ export class VideoReader {
   }
 }
 
+/** How many output pixels one layer pixel covers, for a draw's matrix. */
+function layerToOutputScale(draw: VisualDraw, outputScale: number): number {
+  const [a, b, c, d] = draw.matrix;
+  return Math.max(Math.hypot(a, b), Math.hypot(c, d)) * outputScale;
+}
+
 /**
  * Resolves draws to images. Each draw key gets its own reader, so two clips
  * cut from the same file never fight over one decoder.
  */
 export class FrameProvider {
   private readers = new Map<string, VideoReader>();
-  /** Last good image per key, shown while a new frame is still decoding. */
-  private last = new Map<string, FrameImage>();
+  /** Last good frame per key, shown while a new frame is still decoding. */
+  private last = new Map<string, PlacedImage>();
+  private text = new TextRasterizer();
 
   constructor(
     private readonly handle: (assetId: string) => MediaHandle | undefined,
   ) {}
 
-  private reader(draw: VisualDraw): VideoReader | null {
-    let r = this.readers.get(draw.key);
+  private reader(key: string, assetId: string): VideoReader | null {
+    let r = this.readers.get(key);
     if (r) return r;
-    const track = this.handle(draw.assetId)?.videoTrack;
+    const track = this.handle(assetId)?.videoTrack;
     if (!track) return null;
     r = new VideoReader(track);
-    this.readers.set(draw.key, r);
+    this.readers.set(key, r);
     return r;
   }
 
-  /** Images for every draw. `keep` lists extra keys whose readers stay warm. */
+  /**
+   * Images for every draw. `outputScale` is output pixels per composition
+   * pixel (text is drawn at that resolution). `keep` lists extra keys whose
+   * video readers stay warm.
+   */
   async images(
     draws: VisualDraw[],
+    outputScale: number,
     keep: Iterable<string> = [],
-  ): Promise<Map<string, FrameImage>> {
-    const out = new Map<string, FrameImage>();
+  ): Promise<Map<string, PlacedImage>> {
+    const out = new Map<string, PlacedImage>();
     await Promise.all(
       draws.map(async (d) => {
-        if (d.assetKind === "image") {
-          const img = this.handle(d.assetId)?.image;
+        const src = d.source;
+        if (src.kind === "text") {
+          const img = await this.text.render(
+            src.text,
+            src.style,
+            layerToOutputScale(d, outputScale),
+          );
           if (img) out.set(d.key, img);
           return;
         }
-        const wrapped = await this.reader(d)?.frameAt(d.sourceTime / US);
+        if (src.kind === "image") {
+          const image = this.handle(src.assetId)?.image;
+          if (image) {
+            out.set(d.key, {
+              image,
+              x: 0,
+              y: 0,
+              width: src.width,
+              height: src.height,
+              fixed: true,
+            });
+          }
+          return;
+        }
+        const wrapped = await this.reader(d.key, src.assetId)?.frameAt(
+          src.time / US,
+        );
         if (wrapped) {
-          out.set(d.key, wrapped.canvas);
-          this.last.set(d.key, wrapped.canvas);
+          const placed: PlacedImage = {
+            image: wrapped.canvas,
+            x: 0,
+            y: 0,
+            width: src.width,
+            height: src.height,
+            // Pooled canvases are reused for later frames.
+            fixed: false,
+          };
+          out.set(d.key, placed);
+          this.last.set(d.key, placed);
         } else {
           const prev = this.last.get(d.key);
           if (prev) out.set(d.key, prev);
@@ -127,9 +170,10 @@ export class FrameProvider {
   /** Start decoding upcoming draws so cuts don't stall. Fire and forget. */
   warm(draws: VisualDraw[]): void {
     for (const d of draws) {
-      if (d.assetKind !== "video" || this.readers.has(d.key)) continue;
-      void this.reader(d)
-        ?.frameAt(d.sourceTime / US)
+      const src = d.source;
+      if (src.kind !== "video" || this.readers.has(d.key)) continue;
+      void this.reader(d.key, src.assetId)
+        ?.frameAt(src.time / US)
         .catch(() => undefined);
     }
   }

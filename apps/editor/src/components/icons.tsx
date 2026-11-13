@@ -120,6 +120,11 @@ export const MusicIcon = (p: P) => (
     <circle cx="11.2" cy="10.5" r="1.8" />
   </Svg>
 );
+export const TextIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 4V2.5h10V4M8 2.5v11M6 13.5h4" />
+  </Svg>
+);
 export const ZoomFitIcon = (p: P) => (
   <Svg {...p}>
     <path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3" />

@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { useEditor, useSelectedLayer } from "../state/store.ts";
 import { Diamond } from "./icons.tsx";
 import { NumberField } from "./NumberField.tsx";
+import { TextInspector } from "./TextInspector.tsx";
 
 export function Inspector() {
   const sel = useSelectedLayer();
@@ -195,14 +196,18 @@ function LayerInspector({ layer }: { layer: Layer }) {
       <div className="border-line-soft border-b px-4 py-3">
         <h2 className="truncate font-semibold text-ink">{layer.name}</h2>
         <p className="mt-0.5 text-ink-faint">
-          {asset?.kind === "image"
-            ? "Photo"
-            : asset?.kind === "audio"
-              ? "Audio"
-              : "Video"}
+          {layer.kind === "text"
+            ? "Text"
+            : asset?.kind === "image"
+              ? "Photo"
+              : asset?.kind === "audio"
+                ? "Audio"
+                : "Video"}
           {!inRange && " · playhead is outside this clip"}
         </p>
       </div>
+
+      {layer.kind === "text" && <TextInspector layer={layer} />}
 
       {visual && (
         <Section title="Transform">
@@ -264,10 +269,12 @@ function LayerInspector({ layer }: { layer: Layer }) {
             onCommit={seal}
             trailing={kfButton("opacity", "opacity")}
           />
-          <div className="mt-2 flex gap-1.5">
-            <FitButton layer={layer} mode="fit" />
-            <FitButton layer={layer} mode="fill" />
-          </div>
+          {layer.kind === "media" && (
+            <div className="mt-2 flex gap-1.5">
+              <FitButton layer={layer} mode="fit" />
+              <FitButton layer={layer} mode="fill" />
+            </div>
+          )}
         </Section>
       )}
 

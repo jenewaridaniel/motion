@@ -48,10 +48,28 @@ function parseHex(hex: string): [number, number, number] {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
+/**
+ * An image and where it sits in its layer's space. Video and photos fill
+ * (0, 0, width, height); text is centred on the layer's origin.
+ */
+export interface PlacedImage {
+  image: FrameImage;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /**
+   * True when this exact image object never changes (photos, laid-out text).
+   * Then it is only uploaded to the GPU once. Video frames come from reused
+   * canvases whose pixels change, so they must leave this false.
+   */
+  fixed: boolean;
+}
+
 export interface RenderInput {
   draws: VisualDraw[];
   /** Image for each draw, by `draw.key`. Draws without an image are skipped. */
-  images: Map<string, FrameImage>;
+  images: Map<string, PlacedImage>;
   compWidth: number;
   compHeight: number;
   background: string;
@@ -67,8 +85,8 @@ export class Compositor {
   private uMatrix: WebGLUniformLocation | null;
   private uOpacity: WebGLUniformLocation | null;
   private textures = new Map<string, WebGLTexture>();
-  /** The still image last uploaded per key. Canvases and frames always re-upload. */
-  private uploaded = new Map<string, ImageBitmap>();
+  /** The fixed image last uploaded per key, so it isn't uploaded again. */
+  private uploaded = new Map<string, FrameImage>();
   private lost = false;
 
   constructor(
@@ -164,30 +182,35 @@ export class Compositor {
     ];
     const used = new Set<string>();
     for (const draw of input.draws) {
-      const image = input.images.get(draw.key);
-      if (!image) continue;
+      const placed = input.images.get(draw.key);
+      if (!placed || placed.width <= 0 || placed.height <= 0) continue;
       used.add(draw.key);
       const tex = this.texture(draw.key);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      const still = image instanceof ImageBitmap ? image : null;
-      if (!still || this.uploaded.get(draw.key) !== still) {
+      if (!placed.fixed || this.uploaded.get(draw.key) !== placed.image) {
         gl.texImage2D(
           gl.TEXTURE_2D,
           0,
           gl.RGBA,
           gl.RGBA,
           gl.UNSIGNED_BYTE,
-          image as TexImageSource,
+          placed.image as TexImageSource,
         );
-        if (still) this.uploaded.set(draw.key, still);
+        if (placed.fixed) this.uploaded.set(draw.key, placed.image);
         else this.uploaded.delete(draw.key);
       }
-      // Unit quad to source pixels to comp pixels to clip space.
-      const m = multiply(
-        toClip,
-        multiply(draw.matrix, [draw.width, 0, 0, draw.height, 0, 0]),
-      );
+      // Unit quad to the image's rectangle in layer space, then to comp
+      // pixels, then to clip space.
+      const rect: Affine = [
+        placed.width,
+        0,
+        0,
+        placed.height,
+        placed.x,
+        placed.y,
+      ];
+      const m = multiply(toClip, multiply(draw.matrix, rect));
       // Column-major mat3.
       gl.uniformMatrix3fv(
         this.uMatrix,

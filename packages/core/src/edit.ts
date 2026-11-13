@@ -10,9 +10,11 @@ import {
   type Composition,
   containScale,
   createMediaLayer,
+  createTextLayer,
   createTrack,
   findLayer,
   findTrack,
+  hasSource,
   type Id,
   type Layer,
   layerEnd,
@@ -20,7 +22,10 @@ import {
   newId,
   type Project,
   rootComposition,
+  type TextLayer,
+  type TextStyle,
   type Track,
+  textLayerName,
 } from "./model.ts";
 import {
   type Animatable,
@@ -131,6 +136,65 @@ export function liftToOverlay(p: Project, layerId: Id): boolean {
   return true;
 }
 
+// ---------------------------------------------------------------- text
+
+/**
+ * Add a text clip at `at`, on a text track above everything. Reuses the top
+ * text track if the clip fits there, so captions line up on one row.
+ */
+export function addText(
+  p: Project,
+  at: Micros,
+  opts: { text?: string; style?: Partial<TextStyle> } = {},
+): Id | null {
+  const comp = rootComposition(p);
+  const layer = createTextLayer(
+    comp,
+    Math.max(0, Math.round(at)),
+    opts.text,
+    opts.style,
+  );
+  const isTextTrack = (t: Track) =>
+    t.kind === "visual" &&
+    !t.magnetic &&
+    t.layers.length > 0 &&
+    t.layers.every((l) => l.kind === "text");
+  let track = comp.tracks.find(
+    (t) => isTextTrack(t) && fits(t, layer.start, layer.duration),
+  );
+  if (!track) {
+    track = createTrack("visual", { name: "Text" });
+    comp.tracks.unshift(track);
+  }
+  track.layers.push(layer);
+  sortTrack(track);
+  return layer.id;
+}
+
+function findText(p: Project, layerId: Id): TextLayer | null {
+  const layer = findLayer(p, layerId)?.layer;
+  return layer?.kind === "text" ? layer : null;
+}
+
+export function setText(p: Project, layerId: Id, text: string): boolean {
+  const layer = findText(p, layerId);
+  if (!layer) return false;
+  layer.text = text;
+  layer.name = textLayerName(text);
+  return true;
+}
+
+export function setTextStyle(
+  p: Project,
+  layerId: Id,
+  patch: Partial<TextStyle>,
+): boolean {
+  const layer = findText(p, layerId);
+  if (!layer) return false;
+  Object.assign(layer.style, patch);
+  return true;
+}
+
 // ---------------------------------------------------------------- timing
 
 /**
@@ -206,12 +270,16 @@ export function trimLayer(
     return true;
   }
 
-  // Start edge. The earliest start is where the source runs out (stills never do).
-  const still =
-    layer.kind === "media" && p.assets[layer.assetId]?.kind === "image";
-  const earliestBySource = still
-    ? 0
-    : layer.start - Math.floor(layer.inPoint / layer.speed);
+  // Start edge. The earliest start is where the source runs out. Photos and
+  // text have no source time, so they can grow back to zero.
+  const timed =
+    hasSource(layer) &&
+    !(layer.kind === "media" && p.assets[layer.assetId]?.kind === "image")
+      ? layer
+      : null;
+  const earliestBySource = timed
+    ? timed.start - Math.floor(timed.inPoint / timed.speed)
+    : 0;
   let target = Math.round(to);
   target = Math.min(target, end - minDur);
   target = Math.max(target, earliestBySource, 0);
@@ -221,10 +289,10 @@ export function trimLayer(
   }
   const delta = target - layer.start;
   if (delta === 0) return true;
-  if (!still) {
-    layer.inPoint = Math.max(
+  if (timed) {
+    timed.inPoint = Math.max(
       0,
-      layer.inPoint + Math.round(delta * layer.speed),
+      timed.inPoint + Math.round(delta * timed.speed),
     );
   }
   layer.duration = end - target;
@@ -267,7 +335,9 @@ export function splitLayer(p: Project, layerId: Id, at: Micros): Id | null {
   right.id = newId();
   right.start = layer.start + local;
   right.duration = layer.duration - local;
-  right.inPoint = layer.inPoint + Math.round(local * layer.speed);
+  if (hasSource(right) && hasSource(layer)) {
+    right.inPoint = layer.inPoint + Math.round(local * layer.speed);
+  }
   // Shift keyframes so both halves keep exactly the same animation.
   forEachProperty(right, (prop) => shiftKeyframes(prop, -local));
   layer.duration = local;
@@ -422,10 +492,20 @@ export function setParent(
 export function setAspect(p: Project, aspect: AspectKey): void {
   const comp = rootComposition(p);
   const { width, height } = ASPECTS[aspect];
+  const sx = width / comp.width;
+  const sy = height / comp.height;
   comp.width = width;
   comp.height = height;
   for (const track of comp.tracks) {
     for (const layer of track.layers) {
+      if (layer.kind === "text") {
+        // Same fraction of the canvas, so a caption near the bottom stays there.
+        const pos = layer.transform.position;
+        const move = ([x, y]: Vec2): Vec2 => [x * sx, y * sy];
+        pos.value = move(pos.value);
+        for (const k of pos.keyframes ?? []) k.value = move(k.value);
+        continue;
+      }
       if (layer.kind !== "media") continue;
       const asset = p.assets[layer.assetId];
       if (!asset || asset.kind === "audio") continue;

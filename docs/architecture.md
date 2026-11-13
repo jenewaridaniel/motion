@@ -35,6 +35,7 @@ Track       { kind: visual | audio, magnetic, hidden, muted, layers[] }
 Layer       { start, duration, parentId?, transform, opacity, ...kind }
   kind media        assetId, inPoint, speed, volume
   kind composition  compositionId, inPoint, speed      (nested comp, used for motion design)
+  kind text         text, style                          (layer space centred on the text block)
 ```
 
 - **Time** is in integer microseconds (`Micros`), the same unit WebCodecs uses. That keeps time exact with no float drift.
@@ -44,7 +45,13 @@ Layer       { start, duration, parentId?, transform, opacity, ...kind }
 - **Nesting**: a `composition` layer draws another composition through its own transform. Nested content is not clipped to the nested canvas yet (that needs render-to-texture, see below).
 - **Magnetic track**: the main track has no gaps. Its clips are packed back to back after every edit (ripple). Overlay and audio tracks are free and don't allow overlaps.
 
-Planned layer kinds, which slot into the same union: `text`, `shape` (paths, strokes, trim paths), `solid`, `adjustment`.
+Planned layer kinds, which slot into the same union: `shape` (paths, strokes, trim paths), `solid`, `adjustment`.
+
+## Text
+
+- **Model:** `TextLayer` holds the words and a `TextStyle` (font, weight, italic, size, color, alignment, line height, letter spacing, optional outline, shadow and background box). Transform and opacity animate like any layer. Text has no source time, so it trims freely and has no sound.
+- **Drawing:** `evaluateFrame` returns draws whose `source` is `video`, `image` or `text`. `media.TextRasterizer` draws text with Canvas 2D at the size it will appear (layer scale x output scale, rounded to quarter-octave steps), caches the result (LRU, 64 megapixels max) and hands the compositor a `PlacedImage` centred on the layer origin. Same path for preview and export, so 4K exports get 4K-sharp text.
+- **Fonts:** bundled with the editor (`apps/editor/src/lib/fonts.ts`, all SIL OFL), loaded only when used. Core's default is generic `sans-serif`; the editor passes its default (Archivo).
 
 ## Edits and undo
 
