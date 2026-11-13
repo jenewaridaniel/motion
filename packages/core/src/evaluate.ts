@@ -1,6 +1,8 @@
+import { shakeOffset } from "./effects.ts";
 import { type DrawStyle, resolveStyle } from "./look.ts";
 import {
   type Affine,
+  apply,
   IDENTITY,
   multiply,
   rotate,
@@ -82,6 +84,27 @@ function layersById(comp: Composition): Map<Id, Layer> {
   return map;
 }
 
+/** Camera shake moves the whole layer around its anchor, on the canvas. */
+function withShake(
+  layer: Layer,
+  local: Micros,
+  matrix: Affine,
+  shortSide: number,
+): Affine {
+  const shake = layer.effects?.shake;
+  if (!shake) return matrix;
+  const amount = valueAt(shake.amount, local);
+  const o = shakeOffset(amount, shake.speed, local, shortSide);
+  if (o.dx === 0 && o.dy === 0 && o.rotation === 0) return matrix;
+  const [ax, ay] = valueAt(layer.transform.anchor, local);
+  const [cx, cy] = apply(matrix, ax, ay);
+  const around = multiply(
+    multiply(translate(cx + o.dx, cy + o.dy), rotate(o.rotation)),
+    translate(-cx, -cy),
+  );
+  return multiply(around, matrix);
+}
+
 const isActive = (l: Layer, t: Micros) => t >= l.start && t < layerEnd(l);
 
 function drawComposition(
@@ -97,6 +120,7 @@ function drawComposition(
   const comp = p.compositions[compId];
   if (!comp || depth > MAX_DEPTH) return;
   const byId = layersById(comp);
+  const shortSide = Math.min(comp.width, comp.height);
   // tracks[0] is on top, so draw from the last track up.
   for (let i = comp.tracks.length - 1; i >= 0; i--) {
     const track = comp.tracks[i];
@@ -106,7 +130,12 @@ function drawComposition(
       const local = t - layer.start;
       const opacity = parentOpacity * clamp01(valueAt(layer.opacity, local));
       if (opacity <= 0) continue;
-      const matrix = multiply(parentMatrix, worldMatrix(layer, t, byId));
+      const matrix = withShake(
+        layer,
+        local,
+        multiply(parentMatrix, worldMatrix(layer, t, byId)),
+        shortSide,
+      );
       const key = keyPrefix + layer.id;
       if (layer.kind === "composition") {
         // TODO(render-to-texture): clip nested content to the nested canvas.
@@ -151,7 +180,7 @@ function drawComposition(
           },
           matrix: multiply(matrix, extra),
           opacity: shown,
-          style: resolveStyle(layer, local),
+          style: resolveStyle(layer, local, shortSide),
         });
         continue;
       }
@@ -177,7 +206,7 @@ function drawComposition(
         source,
         matrix,
         opacity,
-        style: resolveStyle(layer, local),
+        style: resolveStyle(layer, local, shortSide),
       });
     }
   }

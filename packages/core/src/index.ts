@@ -2,6 +2,7 @@ export * from "./canvas.ts";
 export * from "./captions.ts";
 export * from "./clip-visuals.ts";
 export * from "./edit.ts";
+export * from "./effects.ts";
 export * from "./evaluate.ts";
 export * from "./export-quality.ts";
 export * from "./history.ts";

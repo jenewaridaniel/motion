@@ -28,6 +28,7 @@ import {
 } from "@motion/core";
 import type { ReactNode } from "react";
 import { useEditor, useSelectedLayer } from "../state/store.ts";
+import { EffectsInspector } from "./EffectsInspector.tsx";
 import { Diamond } from "./icons.tsx";
 import { NumberField } from "./NumberField.tsx";
 import { TextInspector } from "./TextInspector.tsx";
@@ -367,6 +368,10 @@ function LayerInspector({ layer }: { layer: Layer }) {
             <span className="size-7 shrink-0" />
           </div>
         </Section>
+      )}
+
+      {visual && (
+        <EffectsInspector layer={layer} at={at} set={set} kfButton={kfButton} />
       )}
 
       {layer.kind === "media" && (

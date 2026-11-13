@@ -2,6 +2,12 @@
  * How a layer looks, beyond where it is: colour adjustments (each one can be
  * animated) and how it blends with what's under it.
  */
+import {
+  type Effects,
+  type Mask,
+  type ResolvedEffects,
+  resolveEffects,
+} from "./effects.ts";
 import { type Property, valueAt } from "./property.ts";
 import type { Micros } from "./time.ts";
 
@@ -51,28 +57,44 @@ export const BLEND_MODES = [
 export type BlendMode = (typeof BLEND_MODES)[number];
 
 /** Everything the renderer needs about a layer's look at one moment. */
-export interface DrawStyle {
+export interface DrawStyle extends ResolvedEffects {
   blend: BlendMode;
   /** Null when every adjustment is 0, so the renderer can skip colour work. */
   adjust: Record<AdjustKey, number> | null;
 }
 
 export function resolveStyle(
-  layer: { adjust?: Adjustments; blend?: BlendMode },
+  layer: {
+    adjust?: Adjustments;
+    blend?: BlendMode;
+    effects?: Effects;
+    mask?: Mask;
+  },
   local: Micros,
+  shortSide: number,
 ): DrawStyle {
-  const blend = layer.blend ?? "normal";
-  if (!layer.adjust) return { blend, adjust: null };
+  return {
+    blend: layer.blend ?? "normal",
+    adjust: resolveAdjust(layer.adjust, local),
+    ...resolveEffects(layer, local, shortSide),
+  };
+}
+
+function resolveAdjust(
+  adjust: Adjustments | undefined,
+  local: Micros,
+): Record<AdjustKey, number> | null {
+  if (!adjust) return null;
   const out = {} as Record<AdjustKey, number>;
   let any = false;
   for (const k of ADJUST_KEYS) {
-    const p = layer.adjust[k];
+    const p = adjust[k];
     const { min, max } = ADJUST_RANGE[k];
     const v = p ? Math.min(max, Math.max(min, valueAt(p, local))) : 0;
     out[k] = v;
     if (v !== 0) any = true;
   }
-  return { blend, adjust: any ? out : null };
+  return any ? out : null;
 }
 
 /** A ready-made set of adjustments ("filter"). */

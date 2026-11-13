@@ -1,3 +1,4 @@
+import type { Effects, Mask } from "./effects.ts";
 import type { Adjustments, BlendMode } from "./look.ts";
 import { type Property, prop, type Vec2 } from "./property.ts";
 import { type Micros, sec } from "./time.ts";
@@ -55,6 +56,8 @@ interface LayerBase {
   adjust?: Adjustments;
   /** How it combines with the layers under it. Missing means "normal". */
   blend?: BlendMode;
+  effects?: Effects;
+  mask?: Mask;
 }
 
 export interface MediaLayer extends LayerBase {

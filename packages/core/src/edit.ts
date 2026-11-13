@@ -3,6 +3,12 @@
  * and takes absolute targets, so calling it repeatedly during a drag is safe.
  */
 import { current, isDraft } from "immer";
+import {
+  defaultEffect,
+  defaultMask,
+  type EffectKind,
+  type MaskShape,
+} from "./effects.ts";
 import { ADJUST_KEYS, type AdjustKey, type BlendMode, LOOKS } from "./look.ts";
 import {
   ASPECTS,
@@ -420,7 +426,13 @@ export type PropertyPath =
   | "transform.anchor"
   | "opacity"
   | "volume"
-  | `adjust.${AdjustKey}`;
+  | `adjust.${AdjustKey}`
+  | "effects.blur.amount"
+  | `effects.chromaKey.${"similarity" | "smoothness" | "spill"}`
+  | "effects.glitch.amount"
+  | "effects.shake.amount"
+  | `effects.vignette.${"amount" | "size"}`
+  | `mask.${"center" | "size" | "rotation" | "feather"}`;
 
 export function getProperty(
   layer: Layer,
@@ -440,9 +452,24 @@ export function getProperty(
     case "volume":
       return layer.kind === "media" ? layer.volume : null;
   }
-  const key = path.slice("adjust.".length) as AdjustKey;
-  return (layer.adjust?.[key] as Property<Animatable> | undefined) ?? null;
+  if (path.startsWith("adjust.")) {
+    const key = path.slice("adjust.".length) as AdjustKey;
+    return (layer.adjust?.[key] as Property<Animatable> | undefined) ?? null;
+  }
+  // effects.<kind>.<param> and mask.<param>: present only while switched on.
+  const parts = path.split(".");
+  let node: unknown =
+    parts[0] === "effects"
+      ? layer.effects?.[parts[1] as EffectKind]
+      : layer.mask;
+  node = (node as Record<string, unknown> | undefined)?.[
+    parts[parts.length - 1] as string
+  ];
+  return isPropertyNode(node) ? (node as Property<Animatable>) : null;
 }
+
+const isPropertyNode = (v: unknown) =>
+  typeof v === "object" && v !== null && "value" in (v as object);
 
 /**
  * Like getProperty, but creates an adjustment (at 0) the first time it is
@@ -476,8 +503,20 @@ function forEachProperty(
     fn(prop as Property<Animatable>);
   }
   if (layer.kind === "media") fn(layer.volume);
-  for (const p of Object.values(layer.adjust ?? {}))
+  for (const p of Object.values(layer.adjust ?? {})) {
     fn(p as Property<Animatable>);
+  }
+  for (const effect of Object.values(layer.effects ?? {})) {
+    for (const v of Object.values(effect)) {
+      if (isPropertyNode(v)) fn(v as Property<Animatable>);
+    }
+  }
+  if (layer.mask) {
+    const m = layer.mask;
+    for (const p of [m.center, m.size, m.rotation, m.feather]) {
+      fn(p as Property<Animatable>);
+    }
+  }
 }
 
 /** Set a value at composition time `at`. Keyframes it if the property is animated. */
@@ -512,6 +551,77 @@ export function toggleKeyframe(
   );
   if (exists) removeKeyframe(prop, local, tol);
   else setKeyframe(prop, local, valueAt(prop, local), tol);
+  return true;
+}
+
+/** Switch an effect on (with defaults) or off. */
+export function setEffect(
+  p: Project,
+  layerId: Id,
+  kind: EffectKind,
+  on: boolean,
+): boolean {
+  const loc = findLayer(p, layerId);
+  if (!loc) return false;
+  const layer = loc.layer;
+  if (on) {
+    if (!layer.effects) layer.effects = {};
+    if (!layer.effects[kind]) {
+      (layer.effects as Record<EffectKind, unknown>)[kind] =
+        defaultEffect(kind);
+    }
+  } else if (layer.effects) {
+    delete layer.effects[kind];
+    if (Object.keys(layer.effects).length === 0) delete layer.effects;
+  }
+  return true;
+}
+
+/** Settings that aren't animated: the key colour, the shake speed. */
+export function setEffectOption(
+  p: Project,
+  layerId: Id,
+  kind: "chromaKey" | "shake",
+  option: "color" | "speed",
+  value: string | number,
+): boolean {
+  const effects = findLayer(p, layerId)?.layer.effects;
+  if (kind === "chromaKey" && option === "color" && effects?.chromaKey) {
+    if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value))
+      return false;
+    effects.chromaKey.color = value;
+    return true;
+  }
+  if (kind === "shake" && option === "speed" && effects?.shake) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return false;
+    effects.shake.speed = Math.min(30, Math.max(0.1, value));
+    return true;
+  }
+  return false;
+}
+
+/** Set the mask shape (keeping its position and size), or null to remove it. */
+export function setMask(
+  p: Project,
+  layerId: Id,
+  shape: MaskShape | null,
+): boolean {
+  const loc = findLayer(p, layerId);
+  if (!loc) return false;
+  if (!shape) delete loc.layer.mask;
+  else if (loc.layer.mask) loc.layer.mask.shape = shape;
+  else loc.layer.mask = defaultMask(shape);
+  return true;
+}
+
+export function setMaskInvert(
+  p: Project,
+  layerId: Id,
+  invert: boolean,
+): boolean {
+  const mask = findLayer(p, layerId)?.layer.mask;
+  if (!mask) return false;
+  mask.invert = invert;
   return true;
 }
 

@@ -4,6 +4,7 @@
  * Loading a broken project would crash the editor, so every saved project
  * goes through `parseProject` first.
  */
+import { EFFECT_KINDS, MASK_SHAPES } from "./effects.ts";
 import { ADJUST_KEYS, BLEND_MODES } from "./look.ts";
 import {
   type Asset,
@@ -103,6 +104,25 @@ function checkTextAnimation(a: unknown): boolean {
   );
 }
 
+function checkEffects(e: unknown): string | null {
+  if (!isObj(e)) return "invalid effects";
+  for (const [kind, v] of Object.entries(e)) {
+    if (!EFFECT_KINDS.includes(kind as never) || !isObj(v)) {
+      return `an unknown effect (${kind})`;
+    }
+    for (const [k, field] of Object.entries(v)) {
+      if (kind === "chromaKey" && k === "color") {
+        if (!isColor(field)) return "an invalid key colour";
+      } else if (kind === "shake" && k === "speed") {
+        if (!isNum(field)) return "an invalid shake speed";
+      } else if (!isProperty(field, isNum)) {
+        return `an invalid ${kind} setting (${k})`;
+      }
+    }
+  }
+  return null;
+}
+
 function checkLayer(l: unknown, p: Obj): string | null {
   if (!isObj(l) || !isStr(l.id)) return "a layer has no id";
   const where = `layer ${l.id}`;
@@ -122,6 +142,24 @@ function checkLayer(l: unknown, p: Obj): string | null {
   if (!isProperty(l.opacity, isNum)) return `${where} has invalid opacity`;
   if (l.blend !== undefined && !BLEND_MODES.includes(l.blend as never)) {
     return `${where} has an unknown blend mode`;
+  }
+  if (l.effects !== undefined) {
+    const err = checkEffects(l.effects);
+    if (err) return `${where} has ${err}`;
+  }
+  if (l.mask !== undefined) {
+    const m = l.mask;
+    if (
+      !isObj(m) ||
+      !MASK_SHAPES.includes(m.shape as never) ||
+      !isProperty(m.center, isVec2) ||
+      !isProperty(m.size, isVec2) ||
+      !isProperty(m.rotation, isNum) ||
+      !isProperty(m.feather, isNum) ||
+      typeof m.invert !== "boolean"
+    ) {
+      return `${where} has an invalid mask`;
+    }
   }
   if (l.adjust !== undefined) {
     if (!isObj(l.adjust)) return `${where} has invalid adjustments`;

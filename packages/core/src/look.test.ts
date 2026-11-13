@@ -50,7 +50,7 @@ const styleAt = (p: Project, t: number) => evaluateFrame(p, sec(t))[0]!.style;
 describe("colour adjustments", () => {
   it("are off by default, so drawing stays exactly as before", () => {
     const { p } = setup();
-    expect(styleAt(p, 1)).toEqual({ blend: "normal", adjust: null });
+    expect(styleAt(p, 1)).toMatchObject({ blend: "normal", adjust: null });
   });
 
   it("can be set like any property, and are resolved to numbers for drawing", () => {
@@ -73,7 +73,7 @@ describe("colour adjustments", () => {
       toggleKeyframe(d, id, "adjust.contrast", sec(4));
       setPropertyValue(d, id, "adjust.contrast", 1, sec(4));
     });
-    expect(styleAt(p, 0)).toEqual({ blend: "normal", adjust: null });
+    expect(styleAt(p, 0)).toMatchObject({ blend: "normal", adjust: null });
     expect(styleAt(p, 2).adjust!.contrast).toBeGreaterThan(0);
     expect(styleAt(p, 2).adjust!.contrast).toBeLessThan(1);
     expect(styleAt(p, 5).adjust!.contrast).toBe(1);
