@@ -35,13 +35,20 @@ Needs the code on GitHub (say "push" first).
 ## Option B: upload from this computer (no GitHub needed)
 
 ```sh
-pnpm build:site
-npx netlify-cli deploy --dir=site            # a draft address to check first
-npx netlify-cli deploy --dir=site --prod     # the real address
+pnpm deploy:site
 ```
 
-The first time, it opens the browser to log in and asks which site to use
-(create a new one, or link an existing one).
+That builds the site and uploads `site/` with the Netlify CLI. It runs
+`npx netlify-cli deploy --dir="$PWD/site" --filter landing --prod`:
+
+- `--dir` is the full path to the finished site, which holds both apps.
+- `--filter landing` only answers the CLI's "which project?" question (it
+  sees several apps in this repository); nothing from `apps/landing` is
+  rebuilt or changed.
+- The first time, it opens the browser to log in, then asks whether to
+  create a new Netlify project or link an existing one. The link is saved in
+  `.netlify/` (not in git).
+- Leave out `--prod` for a draft address you can check first.
 
 ## Other hosts
 

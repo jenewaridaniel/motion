@@ -10,3 +10,6 @@ dist
 
 # Built website (pnpm build:site)
 /site
+
+# Netlify CLI link to your site (per computer)
+.netlify

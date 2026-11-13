@@ -10,7 +10,8 @@
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "build:site": "node scripts/build-site.mjs",
-    "preview:site": "node scripts/serve-site.mjs"
+    "preview:site": "node scripts/serve-site.mjs",
+    "deploy:site": "pnpm build:site && npx netlify-cli deploy --dir=\"$PWD/site\" --filter landing --prod"
   },
   "devDependencies": {
     "turbo": "2.11.11"
