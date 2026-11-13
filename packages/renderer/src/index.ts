@@ -1,4 +1,9 @@
-import { type Affine, multiply, type VisualDraw } from "@motion/core";
+import {
+  type Affine,
+  type BlendMode,
+  multiply,
+  type VisualDraw,
+} from "@motion/core";
 
 /** Anything WebGL can upload as a texture. */
 export type FrameImage =
@@ -20,15 +25,58 @@ void main() {
   gl_Position = vec4(p.xy, 0.0, 1.0);
 }`;
 
+// Colour work runs only when a layer has adjustments (u_adjust), so plain
+// layers take exactly the same path as before. Maths is on unpremultiplied
+// colour: exposure and white balance in linear light, the rest in display
+// (gamma) space, where they look even to the eye.
 const FRAG = `#version 300 es
 precision mediump float;
 in vec2 v_uv;
 uniform sampler2D u_tex;
 uniform float u_opacity;
+uniform bool u_adjust;
+uniform highp float u_exposure, u_brightness, u_contrast, u_saturation, u_vibrance;
+uniform highp float u_temperature, u_tint, u_highlights, u_shadows, u_fade;
 out vec4 outColor;
+
+highp float luma(highp vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+highp vec3 adjust(highp vec3 rgb) {
+  highp vec3 lin = pow(rgb, vec3(2.2)) * exp2(u_exposure);
+  lin *= vec3(1.0 + 0.2 * u_temperature, 1.0 - 0.15 * u_tint, 1.0 - 0.2 * u_temperature);
+  rgb = pow(max(lin, 0.0), vec3(1.0 / 2.2));
+  rgb += 0.25 * u_brightness;
+  highp float l = luma(rgb);
+  rgb += 0.25 * u_shadows * (1.0 - smoothstep(0.0, 0.5, l));
+  rgb += 0.25 * u_highlights * smoothstep(0.5, 1.0, l);
+  rgb = (rgb - 0.5) * (1.0 + u_contrast) + 0.5;
+  l = luma(rgb);
+  highp float spread = max(rgb.r, max(rgb.g, rgb.b)) - min(rgb.r, min(rgb.g, rgb.b));
+  rgb = mix(vec3(l), rgb, 1.0 + u_saturation + u_vibrance * (1.0 - spread));
+  rgb = mix(rgb, 0.15 + 0.8 * rgb, u_fade);
+  return clamp(rgb, 0.0, 1.0);
+}
+
 void main() {
-  outColor = texture(u_tex, v_uv) * u_opacity;
+  vec4 c = texture(u_tex, v_uv);
+  if (u_adjust && c.a > 0.0) {
+    c.rgb = adjust(c.rgb / c.a) * c.a;
+  }
+  outColor = c * u_opacity;
 }`;
+
+const ADJUST_UNIFORMS = [
+  "exposure",
+  "brightness",
+  "contrast",
+  "saturation",
+  "vibrance",
+  "temperature",
+  "tint",
+  "highlights",
+  "shadows",
+  "fade",
+] as const;
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string) {
   const s = gl.createShader(type);
@@ -84,6 +132,8 @@ export class Compositor {
   private program: WebGLProgram;
   private uMatrix: WebGLUniformLocation | null;
   private uOpacity: WebGLUniformLocation | null;
+  private uAdjust: WebGLUniformLocation | null;
+  private uAdjustValues = new Map<string, WebGLUniformLocation | null>();
   private textures = new Map<string, WebGLTexture>();
   /** The fixed image last uploaded per key, so it isn't uploaded again. */
   private uploaded = new Map<string, FrameImage>();
@@ -122,6 +172,10 @@ export class Compositor {
     gl.useProgram(program);
     this.uMatrix = gl.getUniformLocation(program, "u_matrix");
     this.uOpacity = gl.getUniformLocation(program, "u_opacity");
+    this.uAdjust = gl.getUniformLocation(program, "u_adjust");
+    for (const k of ADJUST_UNIFORMS) {
+      this.uAdjustValues.set(k, gl.getUniformLocation(program, `u_${k}`));
+    }
     gl.uniform1i(gl.getUniformLocation(program, "u_tex"), 0);
 
     const vao = gl.createVertexArray();
@@ -141,6 +195,29 @@ export class Compositor {
     // Textures are uploaded premultiplied, so this is standard "over".
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  }
+
+  /**
+   * GPU blending for each mode, on premultiplied colour (the canvas below is
+   * opaque, so these match the usual definitions).
+   */
+  private setBlend(mode: BlendMode) {
+    const gl = this.gl;
+    gl.blendEquation(mode === "lighten" ? gl.MAX : gl.FUNC_ADD);
+    switch (mode) {
+      case "multiply":
+        gl.blendFunc(gl.DST_COLOR, gl.ONE_MINUS_SRC_ALPHA);
+        break;
+      case "screen":
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
+        break;
+      case "add":
+        gl.blendFunc(gl.ONE, gl.ONE);
+        break;
+      default:
+        // normal (and lighten, whose MAX equation ignores the factors)
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    }
   }
 
   get isLost(): boolean {
@@ -218,8 +295,17 @@ export class Compositor {
         new Float32Array([m[0], m[1], 0, m[2], m[3], 0, m[4], m[5], 1]),
       );
       gl.uniform1f(this.uOpacity, draw.opacity);
+      const adjust = draw.style.adjust;
+      gl.uniform1i(this.uAdjust, adjust ? 1 : 0);
+      if (adjust) {
+        for (const k of ADJUST_UNIFORMS) {
+          gl.uniform1f(this.uAdjustValues.get(k) ?? null, adjust[k]);
+        }
+      }
+      this.setBlend(draw.style.blend);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
+    this.setBlend("normal");
     // Free textures for layers that are gone.
     for (const [key, tex] of this.textures) {
       if (!used.has(key)) {

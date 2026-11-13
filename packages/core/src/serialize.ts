@@ -4,6 +4,7 @@
  * Loading a broken project would crash the editor, so every saved project
  * goes through `parseProject` first.
  */
+import { ADJUST_KEYS, BLEND_MODES } from "./look.ts";
 import {
   type Asset,
   type Project,
@@ -119,6 +120,17 @@ function checkLayer(l: unknown, p: Obj): string | null {
     return `${where} has an invalid transform`;
   }
   if (!isProperty(l.opacity, isNum)) return `${where} has invalid opacity`;
+  if (l.blend !== undefined && !BLEND_MODES.includes(l.blend as never)) {
+    return `${where} has an unknown blend mode`;
+  }
+  if (l.adjust !== undefined) {
+    if (!isObj(l.adjust)) return `${where} has invalid adjustments`;
+    for (const [k, v] of Object.entries(l.adjust)) {
+      if (!ADJUST_KEYS.includes(k as never) || !isProperty(v, isNum)) {
+        return `${where} has an invalid adjustment (${k})`;
+      }
+    }
+  }
   if (l.kind === "text") {
     if (!isStr(l.text)) return `${where} has no text`;
     if (!checkTextStyle(l.style)) return `${where} has an invalid text style`;

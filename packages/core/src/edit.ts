@@ -3,6 +3,7 @@
  * and takes absolute targets, so calling it repeatedly during a drag is safe.
  */
 import { current, isDraft } from "immer";
+import { ADJUST_KEYS, type AdjustKey, type BlendMode, LOOKS } from "./look.ts";
 import {
   ASPECTS,
   type AspectKey,
@@ -32,6 +33,7 @@ import {
 import {
   type Animatable,
   type Property,
+  prop,
   removeKeyframe,
   setKeyframe,
   setValueAt,
@@ -417,7 +419,8 @@ export type PropertyPath =
   | "transform.rotation"
   | "transform.anchor"
   | "opacity"
-  | "volume";
+  | "volume"
+  | `adjust.${AdjustKey}`;
 
 export function getProperty(
   layer: Layer,
@@ -437,6 +440,25 @@ export function getProperty(
     case "volume":
       return layer.kind === "media" ? layer.volume : null;
   }
+  const key = path.slice("adjust.".length) as AdjustKey;
+  return (layer.adjust?.[key] as Property<Animatable> | undefined) ?? null;
+}
+
+/**
+ * Like getProperty, but creates an adjustment (at 0) the first time it is
+ * set, since only touched adjustments are stored.
+ */
+function ensureProperty(
+  layer: Layer,
+  path: PropertyPath,
+): Property<Animatable> | null {
+  const found = getProperty(layer, path);
+  if (found || !path.startsWith("adjust.")) return found;
+  const key = path.slice("adjust.".length) as AdjustKey;
+  if (!ADJUST_KEYS.includes(key)) return null;
+  if (!layer.adjust) layer.adjust = {};
+  layer.adjust[key] = prop(0);
+  return layer.adjust[key] as Property<Animatable>;
 }
 
 function forEachProperty(
@@ -454,6 +476,8 @@ function forEachProperty(
     fn(prop as Property<Animatable>);
   }
   if (layer.kind === "media") fn(layer.volume);
+  for (const p of Object.values(layer.adjust ?? {}))
+    fn(p as Property<Animatable>);
 }
 
 /** Set a value at composition time `at`. Keyframes it if the property is animated. */
@@ -465,7 +489,7 @@ export function setPropertyValue(
   at: Micros,
 ): boolean {
   const loc = findLayer(p, layerId);
-  const prop = loc && getProperty(loc.layer, path);
+  const prop = loc && ensureProperty(loc.layer, path);
   if (!loc || !prop) return false;
   setValueAt(prop, at - loc.layer.start, value, frame(loc.comp) / 2);
   return true;
@@ -479,7 +503,7 @@ export function toggleKeyframe(
   at: Micros,
 ): boolean {
   const loc = findLayer(p, layerId);
-  const prop = loc && getProperty(loc.layer, path);
+  const prop = loc && ensureProperty(loc.layer, path);
   if (!loc || !prop) return false;
   const local = at - loc.layer.start;
   const tol = frame(loc.comp) / 2;
@@ -488,6 +512,32 @@ export function toggleKeyframe(
   );
   if (exists) removeKeyframe(prop, local, tol);
   else setKeyframe(prop, local, valueAt(prop, local), tol);
+  return true;
+}
+
+/** Blend mode for a layer. */
+export function setBlend(p: Project, layerId: Id, blend: BlendMode): boolean {
+  const loc = findLayer(p, layerId);
+  if (!loc) return false;
+  if (blend === "normal") delete loc.layer.blend;
+  else loc.layer.blend = blend;
+  return true;
+}
+
+/**
+ * Apply a ready-made look: replaces all adjustments with its values (no
+ * keyframes). "none" removes them.
+ */
+export function setLook(p: Project, layerId: Id, lookId: string): boolean {
+  const loc = findLayer(p, layerId);
+  const look = LOOKS.find((l) => l.id === lookId);
+  if (!loc || !look) return false;
+  const entries = Object.entries(look.adjust) as [AdjustKey, number][];
+  if (entries.length === 0) {
+    delete loc.layer.adjust;
+    return true;
+  }
+  loc.layer.adjust = Object.fromEntries(entries.map(([k, v]) => [k, prop(v)]));
   return true;
 }
 

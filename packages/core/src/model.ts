@@ -1,3 +1,4 @@
+import type { Adjustments, BlendMode } from "./look.ts";
 import { type Property, prop, type Vec2 } from "./property.ts";
 import { type Micros, sec } from "./time.ts";
 
@@ -50,6 +51,10 @@ interface LayerBase {
   transform: Transform;
   /** 0 to 1. */
   opacity: Property<number>;
+  /** Colour adjustments; only the ones that were changed are stored. */
+  adjust?: Adjustments;
+  /** How it combines with the layers under it. Missing means "normal". */
+  blend?: BlendMode;
 }
 
 export interface MediaLayer extends LayerBase {

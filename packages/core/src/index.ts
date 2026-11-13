@@ -5,6 +5,7 @@ export * from "./edit.ts";
 export * from "./evaluate.ts";
 export * from "./export-quality.ts";
 export * from "./history.ts";
+export * from "./look.ts";
 export * from "./matrix.ts";
 export * from "./model.ts";
 export * from "./projects.ts";

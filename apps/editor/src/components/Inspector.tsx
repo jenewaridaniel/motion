@@ -1,17 +1,25 @@
 import {
+  ADJUST_KEYS,
+  ADJUST_RANGE,
+  type AdjustKey,
   type Animatable,
   ASPECTS,
   type AspectKey,
+  BLEND_MODES,
+  type BlendMode,
   fittedTransform,
   frameTime,
   getProperty,
   type Layer,
+  LOOKS,
   type Property,
   type PropertyPath,
   rootComposition,
   setAspect,
   setBackground,
+  setBlend,
   setFps,
+  setLook,
   setPropertyValue,
   setSpeed,
   toggleKeyframe,
@@ -23,6 +31,19 @@ import { useEditor, useSelectedLayer } from "../state/store.ts";
 import { Diamond } from "./icons.tsx";
 import { NumberField } from "./NumberField.tsx";
 import { TextInspector } from "./TextInspector.tsx";
+
+const ADJUST_LABELS: Record<AdjustKey, string> = {
+  exposure: "Exposure",
+  brightness: "Brightness",
+  contrast: "Contrast",
+  saturation: "Saturation",
+  vibrance: "Vibrance",
+  temperature: "Warmth",
+  tint: "Tint",
+  highlights: "Highlights",
+  shadows: "Shadows",
+  fade: "Fade",
+};
 
 export function Inspector({ inSheet = false }: { inSheet?: boolean }) {
   const sel = useSelectedLayer();
@@ -279,6 +300,72 @@ function LayerInspector({ layer }: { layer: Layer }) {
               <FitButton layer={layer} mode="fill" />
             </div>
           )}
+        </Section>
+      )}
+
+      {visual && (
+        <Section title="Color">
+          <div className="-mx-1 mb-2 flex gap-1 overflow-x-auto px-1 pb-1">
+            {LOOKS.map((look) => (
+              <button
+                key={look.id}
+                type="button"
+                onClick={() => edit((d) => void setLook(d, layer.id, look.id))}
+                className="h-7 shrink-0 rounded-full bg-panel-2 px-3 text-[11px] text-ink-soft transition-colors hover:bg-raised hover:text-ink"
+              >
+                {look.label}
+              </button>
+            ))}
+          </div>
+          {ADJUST_KEYS.map((k) => {
+            const range = ADJUST_RANGE[k];
+            const p = layer.adjust?.[k];
+            const value = p ? at(p) : 0;
+            const stops = k === "exposure";
+            return (
+              <NumberField
+                key={k}
+                label={ADJUST_LABELS[k]}
+                value={value}
+                min={range.min}
+                max={range.max}
+                displayScale={stops ? 1 : 100}
+                step={stops ? 0.1 : 1}
+                precision={stops ? 1 : 0}
+                unit={stops ? "EV" : undefined}
+                onChange={(v, g) => set(`adjust.${k}`, v, g)}
+                onCommit={seal}
+                trailing={kfButton(
+                  `adjust.${k}`,
+                  ADJUST_LABELS[k].toLowerCase(),
+                )}
+              />
+            );
+          })}
+          <div className="mt-1 flex h-7 items-center gap-1.5">
+            <label
+              htmlFor="blend-mode"
+              className="w-16 shrink-0 text-ink-faint"
+            >
+              Blend
+            </label>
+            <select
+              id="blend-mode"
+              value={layer.blend ?? "normal"}
+              onChange={(e) => {
+                const mode = e.target.value as BlendMode;
+                edit((d) => void setBlend(d, layer.id, mode));
+              }}
+              className="h-7 min-w-0 flex-1 rounded-md bg-panel-2 px-1.5 text-ink outline-none focus:ring-1 focus:ring-flare"
+            >
+              {BLEND_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {m[0]?.toUpperCase() + m.slice(1)}
+                </option>
+              ))}
+            </select>
+            <span className="size-7 shrink-0" />
+          </div>
         </Section>
       )}
 

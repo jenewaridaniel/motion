@@ -1,3 +1,4 @@
+import { type DrawStyle, resolveStyle } from "./look.ts";
 import {
   type Affine,
   IDENTITY,
@@ -40,6 +41,7 @@ export interface VisualDraw {
   /** Layer space to root-composition pixels. */
   matrix: Affine;
   opacity: number;
+  style: DrawStyle;
 }
 
 const MAX_DEPTH = 16;
@@ -149,6 +151,7 @@ function drawComposition(
           },
           matrix: multiply(matrix, extra),
           opacity: shown,
+          style: resolveStyle(layer, local),
         });
         continue;
       }
@@ -168,7 +171,14 @@ function drawComposition(
               height,
             }
           : { kind: "image", assetId: asset.id, width, height };
-      out.push({ key, layerId: layer.id, source, matrix, opacity });
+      out.push({
+        key,
+        layerId: layer.id,
+        source,
+        matrix,
+        opacity,
+        style: resolveStyle(layer, local),
+      });
     }
   }
 }
