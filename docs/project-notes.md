@@ -290,6 +290,16 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** every one of the 12 shape kinds on the canvas (all are covered by core tests and the panel thumbnails, but only heart and star were checked as rendered pixels); shapes in phone layout; very large shapes (capped at 4096 pixels per side, like text).
 - Known limits: no gradient fills; stickers have no built-in animations (use keyframes).
 
+### Phase 3, stage G: restyle captions, resize and rotate on the canvas (2026-11-13)
+
+- Built:
+  - **Restyle all captions at once:** in a text clip's settings, "Apply this look to all N text clips on this track" copies its style, animation and placement (position, scale, rotation) to every other text clip on the same track. Their words stay their own. One undo step. It's per track, so text on other tracks is untouched; note that a title added where captions have room can share their track and would be restyled too (the button shows the count).
+  - **Resize and rotate handles on the preview:** a selected clip shows four corner handles (drag to scale evenly around its centre) and a rotate handle above it (drag around; snaps to 45° steps when within 4°, hold Alt for no snapping; follows the pointer through full turns). Each drag is one undo step and keyframes as usual. The handles have larger invisible touch areas. Maths in `core/canvas.ts` (`scaleFromHandle`, `angleStep`, `snapRotation`), tested.
+- Tested by hand (port 5181): selecting the star shows the 4 corner handles and the rotate handle; dragging the bottom-right corner out to twice its distance in 10 steps gave exactly 2× scale with the position unchanged, and one undo restored 1×; a 92° drag on the rotate handle (12 steps) gave 90° (snapped), undo restored 0°, and a 400° drag (24 steps) gave 400°; changed the first caption's colour and pressed the button: all 3 captions yellow with their own words, the text on the other track still white, message "Restyled 2 text clips".
+- Bug found and fixed: changing a shape's kind kept its old name (a star was still called "Heart"); now the name follows the shape (test first).
+- **Not tested:** handles with a real mouse (drags were sent as pointer events to the real handlers, with pointer capture stubbed); handles on a phone (touch areas are 24 px, below the 44 px guideline); scaling a clip that has a parent.
+- Known limits: corner handles scale evenly only (no stretching one side); no handles while playing.
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
@@ -297,7 +307,7 @@ Agreed order (Phase 2 next):
 2. ~~Thumbnails and waveforms on clips.~~ Done.
 3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
 4. ~~A project list~~ Done. **Phase 2 is complete** (only the real-phone test is left, and needs the user).
-Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. ~~E. audio tools~~ done. ~~F. shapes and stickers~~ done. Next: G. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
+Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. ~~E. audio tools~~ done. ~~F. shapes and stickers~~ done. ~~G. captions and canvas handles~~ done. Next: H. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
 Then Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

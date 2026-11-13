@@ -1,11 +1,14 @@
 import {
+  angleStep,
   apply,
   dragPosition,
   findLayer,
   layerHitTest,
   parentMatrixAt,
   rectCorners,
+  scaleFromHandle,
   setPropertyValue,
+  snapRotation,
   type Vec2,
   valueAt,
 } from "@motion/core";
@@ -23,6 +26,24 @@ import { useEditor } from "../state/store.ts";
 const SNAP_PX = 8;
 
 let gesture = 0;
+
+/** Corners in the order `rectCorners` gives them. */
+const CORNER_NAMES = ["top-left", "top-right", "bottom-right", "bottom-left"];
+
+/** A corner (scale) or rotate-handle drag. Points are in canvas pixels. */
+interface HandleDrag {
+  mode: "scale" | "rotate";
+  id: string;
+  /** The layer's anchor on the canvas: what it scales and turns around. */
+  center: [number, number];
+  start: [number, number];
+  /** Previous pointer position (rotation adds up the steps). */
+  last: [number, number];
+  startScale: Vec2;
+  /** Rotation so far, before snapping. */
+  rotation: number;
+  key: string;
+}
 
 interface Drag {
   id: string;
@@ -60,6 +81,8 @@ export function CanvasOverlay({
   const [guides, setGuides] = useState({ x: false, y: false });
   const [hovering, setHovering] = useState(false);
   const drag = useRef<Drag | null>(null);
+  const handleDrag = useRef<HandleDrag | null>(null);
+  const playing = useEditor((s) => s.playing);
 
   // Screen pixels per canvas pixel.
   const k = width / compWidth;
@@ -74,6 +97,85 @@ export function CanvasOverlay({
           .map(([x, y]) => `${x * k},${y * k}`)
           .join(" ")
       : null;
+
+  // Corners on screen, and the rotate handle a little beyond the top edge.
+  const corners =
+    selected && rect
+      ? rectCorners(selected.matrix, rect).map(
+          ([x, y]) => [x * k, y * k] as [number, number],
+        )
+      : null;
+  const rotateHandle = (() => {
+    if (!corners) return null;
+    const [a, b, c, d] = corners as [
+      [number, number],
+      [number, number],
+      [number, number],
+      [number, number],
+    ];
+    const top: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const mid: [number, number] = [
+      (a[0] + b[0] + c[0] + d[0]) / 4,
+      (a[1] + b[1] + c[1] + d[1]) / 4,
+    ];
+    const len = Math.hypot(top[0] - mid[0], top[1] - mid[1]) || 1;
+    const out = 26;
+    return {
+      from: top,
+      at: [
+        top[0] + ((top[0] - mid[0]) / len) * out,
+        top[1] + ((top[1] - mid[1]) / len) * out,
+      ] as [number, number],
+    };
+  })();
+
+  const startHandle = (
+    e: ReactPointerEvent<SVGElement>,
+    mode: HandleDrag["mode"],
+  ) => {
+    if (e.button !== 0 || !selected) return;
+    e.stopPropagation();
+    const s = useEditor.getState();
+    const layer = findLayer(s.project, selected.layerId)?.layer;
+    if (!layer) return;
+    engine.pause();
+    ref.current?.setPointerCapture(e.pointerId);
+    const local = s.playhead - layer.start;
+    const anchor = valueAt(layer.transform.anchor, local);
+    const p = toCanvas(e);
+    handleDrag.current = {
+      mode,
+      id: layer.id,
+      center: apply(selected.matrix, anchor[0], anchor[1]),
+      start: p,
+      last: p,
+      startScale: valueAt(layer.transform.scale, local),
+      rotation: valueAt(layer.transform.rotation, local),
+      key: `handle-${++gesture}`,
+    };
+  };
+
+  const moveHandle = (e: ReactPointerEvent, h: HandleDrag) => {
+    const p = toCanvas(e);
+    const s = useEditor.getState();
+    if (h.mode === "scale") {
+      const next = scaleFromHandle(h.center, h.start, p, h.startScale);
+      s.edit(
+        (d) =>
+          void setPropertyValue(d, h.id, "transform.scale", next, s.playhead),
+        h.key,
+      );
+      return;
+    }
+    h.rotation += angleStep(h.center, h.last, p);
+    h.last = p;
+    const next = e.altKey ? h.rotation : snapRotation(h.rotation);
+    s.edit(
+      (d) =>
+        void setPropertyValue(d, h.id, "transform.rotation", next, s.playhead),
+      h.key,
+    );
+  };
 
   const toCanvas = (e: ReactPointerEvent): [number, number] => {
     const box = ref.current?.getBoundingClientRect();
@@ -111,6 +213,10 @@ export function CanvasOverlay({
   };
 
   const onMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (handleDrag.current) {
+      moveHandle(e, handleDrag.current);
+      return;
+    }
     const [x, y] = toCanvas(e);
     const d = drag.current;
     if (!d) {
@@ -147,6 +253,11 @@ export function CanvasOverlay({
   };
 
   const onUp = () => {
+    if (handleDrag.current) {
+      handleDrag.current = null;
+      useEditor.getState().seal();
+      return;
+    }
     if (drag.current?.moved) useEditor.getState().seal();
     drag.current = null;
     setGuides({ x: false, y: false });
@@ -200,6 +311,62 @@ export function CanvasOverlay({
           strokeWidth={1.5}
           vectorEffect="non-scaling-stroke"
         />
+      )}
+      {corners && rotateHandle && !playing && (
+        <g>
+          <line
+            x1={rotateHandle.from[0]}
+            y1={rotateHandle.from[1]}
+            x2={rotateHandle.at[0]}
+            y2={rotateHandle.at[1]}
+            stroke="var(--color-flare)"
+            strokeWidth={1.5}
+          />
+          {/* Bigger invisible targets, so the handles are easy to grab. */}
+          <circle
+            data-handle="rotate"
+            cx={rotateHandle.at[0]}
+            cy={rotateHandle.at[1]}
+            r={14}
+            fill="transparent"
+            style={{ cursor: "grab" }}
+            onPointerDown={(e) => startHandle(e, "rotate")}
+          />
+          <circle
+            cx={rotateHandle.at[0]}
+            cy={rotateHandle.at[1]}
+            r={5}
+            fill="var(--color-ink)"
+            stroke="var(--color-flare)"
+            strokeWidth={1.5}
+            pointerEvents="none"
+          />
+          {corners.map(([x, y], i) => (
+            <g key={CORNER_NAMES[i]}>
+              <rect
+                data-handle={`scale-${i}`}
+                x={x - 12}
+                y={y - 12}
+                width={24}
+                height={24}
+                fill="transparent"
+                style={{ cursor: i % 2 === 0 ? "nwse-resize" : "nesw-resize" }}
+                onPointerDown={(e) => startHandle(e, "scale")}
+              />
+              <rect
+                x={x - 4.5}
+                y={y - 4.5}
+                width={9}
+                height={9}
+                rx={1.5}
+                fill="var(--color-ink)"
+                stroke="var(--color-flare)"
+                strokeWidth={1.5}
+                pointerEvents="none"
+              />
+            </g>
+          ))}
+        </g>
       )}
     </svg>
   );

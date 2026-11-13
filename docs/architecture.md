@@ -61,7 +61,7 @@ Planned layer kinds, which slot into the same union: `solid`, `adjustment`. (`sh
 
 ## Working on the canvas
 
-`core/canvas.ts` hit-tests draws (topmost rectangle under a point, following rotation and scale) and turns a drag into a position change in the parent's space. The engine keeps the last frame's draws and rectangles; `CanvasOverlay` sits over the preview for select, drag, centre snapping and the selection outline.
+`core/canvas.ts` hit-tests draws (topmost rectangle under a point, following rotation and scale) and turns a drag into a position change in the parent's space. It also has the handle maths: `scaleFromHandle` (even scale from distance to the anchor) and `angleStep` / `snapRotation` (rotation added up step by step). The engine keeps the last frame's draws and rectangles; `CanvasOverlay` sits over the preview for select, drag, centre snapping and the selection outline.
 
 ## Colour, effects and LUTs
 

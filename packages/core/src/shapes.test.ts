@@ -158,6 +158,8 @@ describe("adding shapes and stickers", () => {
     expect(s.style.stroke).toEqual({ color: "#000000", width: 0 });
     expect(s.size).toEqual([300, 1]);
     expect(s.shape).toBe("star");
+    // The clip's name follows its shape (it was "Rectangle").
+    expect(s.name).toBe("Star");
     expect(shapes(h.undo(p))[0]!.shape).toBe("rect");
   });
 

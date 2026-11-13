@@ -23,6 +23,21 @@ export const SHAPE_KINDS = [
 ] as const;
 export type ShapeKind = (typeof SHAPE_KINDS)[number];
 
+export const SHAPE_LABELS: Record<ShapeKind, string> = {
+  rect: "Rectangle",
+  ellipse: "Ellipse",
+  triangle: "Triangle",
+  star: "Star",
+  heart: "Heart",
+  arrow: "Arrow",
+  line: "Line",
+  speech: "Speech bubble",
+  burst: "Burst",
+  sparkle: "Sparkle",
+  check: "Tick",
+  cross: "Cross",
+};
+
 export interface ShapeStyle {
   /** CSS hex, or null for no fill. */
   fill: string | null;

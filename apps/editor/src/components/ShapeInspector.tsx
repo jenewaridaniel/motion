@@ -1,6 +1,6 @@
 import {
   SHAPE_KINDS,
-  type ShapeKind,
+  SHAPE_LABELS,
   type ShapeLayer,
   setShapeKind,
   setShapeSize,
@@ -9,21 +9,6 @@ import {
 import { useEditor } from "../state/store.ts";
 import { NumberField } from "./NumberField.tsx";
 import { ShapeThumb } from "./ShapeThumb.tsx";
-
-const LABELS: Record<ShapeKind, string> = {
-  rect: "Rectangle",
-  ellipse: "Ellipse",
-  triangle: "Triangle",
-  star: "Star",
-  heart: "Heart",
-  arrow: "Arrow",
-  line: "Line",
-  speech: "Speech bubble",
-  burst: "Burst",
-  sparkle: "Sparkle",
-  check: "Tick",
-  cross: "Cross",
-};
 
 const THUMB = { fill: "currentColor", stroke: null, radius: 12 } as const;
 
@@ -47,8 +32,8 @@ export function ShapeInspector({ layer }: { layer: ShapeLayer }) {
             <button
               key={k}
               type="button"
-              title={LABELS[k]}
-              aria-label={LABELS[k]}
+              title={SHAPE_LABELS[k]}
+              aria-label={SHAPE_LABELS[k]}
               aria-pressed={active}
               onClick={() => edit((d) => void setShapeKind(d, layer.id, k))}
               className={`grid h-9 place-items-center rounded-md transition-colors ${active ? "bg-ink text-bg" : "bg-panel-2 text-ink-soft hover:text-ink"}`}

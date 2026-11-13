@@ -51,7 +51,12 @@ import {
   type Vec2,
   valueAt,
 } from "./property.ts";
-import type { ShapeKind, ShapePreset, ShapeStyle } from "./shapes.ts";
+import {
+  SHAPE_LABELS,
+  type ShapeKind,
+  type ShapePreset,
+  type ShapeStyle,
+} from "./shapes.ts";
 import { frameTime, type Micros } from "./time.ts";
 import {
   DEFAULT_TRANSITION,
@@ -336,7 +341,35 @@ export function setShapeKind(
   const layer = findShape(p, layerId);
   if (!layer) return false;
   layer.shape = shape;
+  // The clip's name says what it is.
+  layer.name = SHAPE_LABELS[shape];
   return true;
+}
+
+/**
+ * Give every other text clip on the same track this clip's look: style,
+ * animation and placement (position, scale, rotation). For restyling all
+ * captions at once. Returns how many clips changed.
+ */
+export function applyTextLookToTrack(p: Project, layerId: Id): number {
+  const loc = findLayer(p, layerId);
+  if (!loc || loc.layer.kind !== "text") return 0;
+  const snap = (
+    isDraft(loc.layer) ? current(loc.layer as never) : loc.layer
+  ) as TextLayer;
+  let changed = 0;
+  for (const other of loc.track.layers) {
+    if (other.id === layerId || other.kind !== "text") continue;
+    other.style = structuredClone(snap.style);
+    if (snap.animation) other.animation = structuredClone(snap.animation);
+    else delete other.animation;
+    other.transform.position = structuredClone(snap.transform.position);
+    other.transform.scale = structuredClone(snap.transform.scale);
+    other.transform.rotation = structuredClone(snap.transform.rotation);
+    other.transform.anchor = structuredClone(snap.transform.anchor);
+    changed++;
+  }
+  return changed;
 }
 
 function findText(p: Project, layerId: Id): TextLayer | null {

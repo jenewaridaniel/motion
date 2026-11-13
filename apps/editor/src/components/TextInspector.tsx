@@ -1,4 +1,6 @@
 import {
+  applyTextLookToTrack,
+  rootComposition,
   sec,
   setText,
   setTextAnimation,
@@ -375,7 +377,40 @@ export function TextInspector({ layer }: { layer: TextLayer }) {
         )}
       </Extra>
       <AnimationControls layer={layer} />
+      <ApplyToTrack layer={layer} />
     </section>
+  );
+}
+
+/**
+ * Restyle all captions at once: give every text clip on this track this
+ * clip's style, animation and placement (their words stay their own).
+ */
+function ApplyToTrack({ layer }: { layer: TextLayer }) {
+  const project = useEditor((s) => s.project);
+  const edit = useEditor((s) => s.edit);
+  const toast = useEditor((s) => s.toast);
+  const track = rootComposition(project).tracks.find((t) =>
+    t.layers.some((l) => l.id === layer.id),
+  );
+  const count = track?.layers.filter((l) => l.kind === "text").length ?? 0;
+  if (count < 2) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        let changed = 0;
+        edit((d) => {
+          changed = applyTextLookToTrack(d, layer.id);
+        });
+        toast(
+          `Restyled ${changed} text clip${changed === 1 ? "" : "s"} on this track. Undo puts them back.`,
+        );
+      }}
+      className="mt-3 h-8 w-full rounded-md bg-panel-2 text-[12px] text-ink-soft transition-colors hover:bg-raised hover:text-ink"
+    >
+      Apply this look to all {count} text clips on this track
+    </button>
   );
 }
 
