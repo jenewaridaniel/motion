@@ -41,6 +41,16 @@ npx wrangler pages deploy site --project-name motion
 
 The first time, Wrangler opens the browser to log in to Cloudflare.
 
+## Installable and offline
+
+The editor is a PWA: browsers offer "Install" (desktop: the install icon in
+the address bar; iPhone: Share → Add to Home Screen) and it opens in its own
+window. Its service worker (`apps/editor/pwa.ts`, written at build time)
+keeps the app itself ready offline and saves fonts and other files the first
+time each is used. A new version is picked up on the next visit; nobody's
+edit is interrupted by an update. App icons are drawn by
+`apps/editor/scripts/gen-icons.mjs` from the same shapes as `icon.svg`.
+
 ## Later
 
 - **Own domain:** in the Pages project, **Custom domains → Set up a domain**.

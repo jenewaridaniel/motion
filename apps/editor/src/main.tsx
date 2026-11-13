@@ -16,6 +16,14 @@ if (import.meta.env.DEV) {
 
 void startAutosave();
 
+// Installable and usable offline (production builds only; see pwa.ts).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  const base = import.meta.env.BASE_URL;
+  navigator.serviceWorker
+    .register(`${base}sw.js`, { scope: base })
+    .catch((err) => console.warn("[motion] offline support", err));
+}
+
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root");
 
