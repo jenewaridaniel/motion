@@ -1,0 +1,17 @@
+{
+  "name": "motion",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:landing": "pnpm --filter landing dev",
+    "dev:editor": "pnpm --filter editor dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "2.11.11"
+  },
+  "packageManager": "pnpm@10.25.0"
+}

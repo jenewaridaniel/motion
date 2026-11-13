@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* Motion brand tokens. Full rationale in /DESIGN.md. */
+@theme {
+  --color-paper: oklch(0.972 0.014 345);
+  --color-paper-2: oklch(0.942 0.024 345);
+  --color-line: oklch(0.875 0.032 348);
+  --color-ink: oklch(0.215 0.035 355);
+  --color-ink-soft: oklch(0.45 0.035 355);
+  --color-wine: oklch(0.37 0.13 3);
+  --color-wine-deep: oklch(0.235 0.08 358);
+  --color-wine-ink: oklch(0.19 0.06 358);
+  --color-wine-line: oklch(0.36 0.07 358);
+  --color-on-wine: oklch(0.955 0.016 345);
+  --color-on-wine-soft: oklch(0.8 0.045 350);
+  --color-flare: oklch(0.73 0.185 33);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@theme inline {
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-bodoni), ui-serif, Georgia, serif;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: var(--color-wine);
+    color: var(--color-on-wine);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-flare);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+}
+
+/* Italic serif used for emphasised words ("Zero watermark."). */
+@utility serif-em {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-variation-settings: "opsz" 96;
+  letter-spacing: -0.02em;
+}
+
+/* Archivo width axis. */
+@utility font-wide {
+  font-stretch: 125%;
+}
+@utility font-semiwide {
+  font-stretch: 112%;
+}
+
+/* Elements GSAP reveals start hidden, but only when JS is running and motion is allowed. */
+@media (prefers-reduced-motion: no-preference) {
+  .js [data-reveal] {
+    visibility: hidden;
+  }
+}
+.js [data-card] {
+  opacity: 0;
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@motion/media",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src"
+  },
+  "dependencies": {
+    "@motion/core": "workspace:*",
+    "@motion/renderer": "workspace:*",
+    "mediabunny": "1.65.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.2",
+    "typescript": "5.9.3"
+  }
+}

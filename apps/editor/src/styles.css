@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "@fontsource-variable/archivo/wdth.css";
+
+/*
+ * Editor theme: the landing palette, taken dark and dense.
+ * Every neutral is tinted toward the wine hue (355). See /DESIGN.md.
+ */
+@theme {
+  --color-bg: oklch(0.155 0.016 355);
+  --color-panel: oklch(0.19 0.02 355);
+  --color-panel-2: oklch(0.225 0.024 355);
+  --color-raised: oklch(0.265 0.028 355);
+  --color-line: oklch(0.3 0.028 355);
+  --color-line-soft: oklch(0.245 0.024 355);
+  --color-ink: oklch(0.95 0.012 345);
+  --color-ink-soft: oklch(0.76 0.026 350);
+  --color-ink-faint: oklch(0.58 0.028 350);
+  --color-wine: oklch(0.37 0.13 3);
+  --color-wine-hi: oklch(0.52 0.16 3);
+  --color-flare: oklch(0.73 0.185 33);
+  --color-flare-ink: oklch(0.19 0.06 358);
+  --color-danger: oklch(0.68 0.17 25);
+
+  /* Track clips: same lightness and chroma, hue varies. */
+  --color-clip-main: oklch(0.52 0.1 350);
+  --color-clip-overlay: oklch(0.52 0.1 305);
+  --color-clip-audio: oklch(0.52 0.1 165);
+
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  ::selection {
+    background: var(--color-wine);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-flare);
+    outline-offset: 2px;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
+@utility font-semiwide {
+  font-stretch: 112%;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin scrollbars that sit in the dark panels. */
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}

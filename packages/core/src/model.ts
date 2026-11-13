@@ -1,0 +1,269 @@
+import { type Property, prop, type Vec2 } from "./property.ts";
+import { type Micros, sec } from "./time.ts";
+
+export type Id = string;
+
+export function newId(): Id {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// ---------------------------------------------------------------- assets
+
+export type AssetKind = "video" | "image" | "audio";
+
+/** Metadata for an imported file. The file itself lives outside the model. */
+export interface Asset {
+  id: Id;
+  kind: AssetKind;
+  name: string;
+  /** Source duration. 0 for images, which can be stretched to any length. */
+  duration: Micros;
+  width: number;
+  height: number;
+  hasVideo: boolean;
+  hasAudio: boolean;
+}
+
+// ---------------------------------------------------------------- layers
+
+export interface Transform {
+  /** Pivot, in the layer's own pixels. */
+  anchor: Property<Vec2>;
+  /** Where the anchor sits, in composition pixels. */
+  position: Property<Vec2>;
+  scale: Property<Vec2>;
+  /** Degrees, clockwise. */
+  rotation: Property<number>;
+}
+
+interface LayerBase {
+  id: Id;
+  name: string;
+  /** Composition time where the layer begins. */
+  start: Micros;
+  duration: Micros;
+  /** Another layer in the same composition whose transform this one follows. */
+  parentId?: Id;
+  transform: Transform;
+  /** 0 to 1. */
+  opacity: Property<number>;
+}
+
+export interface MediaLayer extends LayerBase {
+  kind: "media";
+  assetId: Id;
+  /** Source time at the layer's first frame. */
+  inPoint: Micros;
+  /** 1 is normal. 2 plays twice as fast and lasts half as long. */
+  speed: number;
+  /** Linear gain, 0 to 2. */
+  volume: Property<number>;
+}
+
+/** A nested composition, used for grouping and motion design. */
+export interface CompositionLayer extends LayerBase {
+  kind: "composition";
+  compositionId: Id;
+  inPoint: Micros;
+  speed: number;
+}
+
+export type Layer = MediaLayer | CompositionLayer;
+
+// ---------------------------------------------------------------- tracks
+
+export interface Track {
+  id: Id;
+  kind: "visual" | "audio";
+  name: string;
+  /** Magnetic tracks have no gaps: clips are packed back to back. */
+  magnetic: boolean;
+  hidden: boolean;
+  muted: boolean;
+  /** Sorted by start, never overlapping. */
+  layers: Layer[];
+}
+
+export interface Composition {
+  id: Id;
+  name: string;
+  width: number;
+  height: number;
+  fps: number;
+  /** CSS hex, e.g. "#000000". */
+  background: string;
+  /** Index 0 is drawn on top. */
+  tracks: Track[];
+}
+
+export interface Project {
+  version: 1;
+  id: Id;
+  name: string;
+  assets: Record<Id, Asset>;
+  compositions: Record<Id, Composition>;
+  rootCompositionId: Id;
+}
+
+// ---------------------------------------------------------------- canvas presets
+
+export const ASPECTS = {
+  "9:16": { width: 1080, height: 1920, label: "9:16 Vertical" },
+  "16:9": { width: 1920, height: 1080, label: "16:9 Landscape" },
+  "1:1": { width: 1080, height: 1080, label: "1:1 Square" },
+  "4:5": { width: 1080, height: 1350, label: "4:5 Portrait" },
+} as const;
+
+export type AspectKey = keyof typeof ASPECTS;
+
+// ---------------------------------------------------------------- factories
+
+export function createTrack(
+  kind: Track["kind"],
+  opts: Partial<Omit<Track, "id" | "kind">> = {},
+): Track {
+  return {
+    id: newId(),
+    kind,
+    name: opts.name ?? (kind === "audio" ? "Audio" : "Overlay"),
+    magnetic: opts.magnetic ?? false,
+    hidden: opts.hidden ?? false,
+    muted: opts.muted ?? false,
+    layers: opts.layers ?? [],
+  };
+}
+
+export function createComposition(
+  opts: Partial<Omit<Composition, "id">> = {},
+): Composition {
+  return {
+    id: newId(),
+    name: opts.name ?? "Main",
+    width: opts.width ?? ASPECTS["9:16"].width,
+    height: opts.height ?? ASPECTS["9:16"].height,
+    fps: opts.fps ?? 30,
+    background: opts.background ?? "#000000",
+    tracks: opts.tracks ?? [
+      createTrack("visual", { name: "Main", magnetic: true }),
+    ],
+  };
+}
+
+export function createProject(name = "Untitled project"): Project {
+  const root = createComposition();
+  return {
+    version: 1,
+    id: newId(),
+    name,
+    assets: {},
+    compositions: { [root.id]: root },
+    rootCompositionId: root.id,
+  };
+}
+
+/** Uniform scale that fits `w × h` inside `cw × ch` without cropping. */
+export function containScale(w: number, h: number, cw: number, ch: number) {
+  if (w <= 0 || h <= 0) return 1;
+  return Math.min(cw / w, ch / h);
+}
+
+/** Transform that centres a `w × h` source in the composition, fitted. */
+export function fittedTransform(
+  w: number,
+  h: number,
+  comp: Pick<Composition, "width" | "height">,
+): Transform {
+  const s = containScale(w, h, comp.width, comp.height);
+  return {
+    anchor: prop<Vec2>([w / 2, h / 2]),
+    position: prop<Vec2>([comp.width / 2, comp.height / 2]),
+    scale: prop<Vec2>([s, s]),
+    rotation: prop(0),
+  };
+}
+
+export const DEFAULT_IMAGE_DURATION = sec(5);
+
+export function createMediaLayer(
+  asset: Asset,
+  comp: Pick<Composition, "width" | "height">,
+  start: Micros,
+): MediaLayer {
+  const duration =
+    asset.kind === "image" ? DEFAULT_IMAGE_DURATION : asset.duration;
+  return {
+    id: newId(),
+    kind: "media",
+    name: asset.name,
+    assetId: asset.id,
+    start,
+    duration,
+    inPoint: 0,
+    speed: 1,
+    transform: fittedTransform(asset.width || 1, asset.height || 1, comp),
+    opacity: prop(1),
+    volume: prop(1),
+  };
+}
+
+// ---------------------------------------------------------------- lookups
+
+export const rootComposition = (p: Project): Composition =>
+  p.compositions[p.rootCompositionId] as Composition;
+
+export const layerEnd = (l: Layer): Micros => l.start + l.duration;
+
+export function compositionDuration(comp: Composition): Micros {
+  let end = 0;
+  for (const t of comp.tracks) {
+    for (const l of t.layers) end = Math.max(end, layerEnd(l));
+  }
+  return end;
+}
+
+export interface LayerLocation {
+  comp: Composition;
+  track: Track;
+  layer: Layer;
+  index: number;
+}
+
+export function findLayer(p: Project, layerId: Id): LayerLocation | null {
+  for (const comp of Object.values(p.compositions)) {
+    for (const track of comp.tracks) {
+      const index = track.layers.findIndex((l) => l.id === layerId);
+      if (index >= 0) {
+        return { comp, track, layer: track.layers[index] as Layer, index };
+      }
+    }
+  }
+  return null;
+}
+
+export function findTrack(
+  p: Project,
+  trackId: Id,
+): { comp: Composition; track: Track } | null {
+  for (const comp of Object.values(p.compositions)) {
+    const track = comp.tracks.find((t) => t.id === trackId);
+    if (track) return { comp, track };
+  }
+  return null;
+}
+
+/** Longest the layer can last given its source and speed. */
+export function maxLayerDuration(p: Project, layer: Layer): Micros {
+  if (layer.kind === "media") {
+    const asset = p.assets[layer.assetId];
+    if (!asset || asset.kind === "image") return Number.POSITIVE_INFINITY;
+    return Math.floor((asset.duration - layer.inPoint) / layer.speed);
+  }
+  const nested = p.compositions[layer.compositionId];
+  if (!nested) return 0;
+  return Math.floor(
+    (compositionDuration(nested) - layer.inPoint) / layer.speed,
+  );
+}
