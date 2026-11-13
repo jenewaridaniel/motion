@@ -213,12 +213,21 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** real camera footage, very long videos (only short ones), Safari and Firefox.
 - Waveforms and thumbnails are kept in memory only, so they're worked out again after a reload (1 s for 10 minutes of audio).
 
+### Phase 2, step 3: phone layout and touch timeline (2026-11-13)
+
+- Built: below 1024 px wide, a compact layout: top bar, preview, timeline, and a bottom toolbar (Media, Text, Edit/Canvas, Split, Delete, Undo, Redo). Media and clip settings open as slide-up panels (55% of the height, so the video stays visible). Short screens (phone sideways) put the preview and timeline side by side. Desktop layout unchanged at 1024 px and up.
+- Touch on the timeline: swipe to scroll with momentum, pinch to zoom around the fingers, tap to select, press and hold (350 ms) to pick a clip up and move it, trim handles only on a selected clip (and wider on touch screens), tap empty space to deselect, drag the ruler to scrub. Mouse behaviour unchanged. Gesture math in `apps/editor/src/lib/gestures.ts` with 8 tests (the editor's first tests).
+- Tested in Chrome with the editor in a 390x844 (and 844x390) frame and touch pointer events: swipe + momentum, pinch (3x spread → 3x zoom, same moment under the fingers), tap, swipe on a clip (scrolls, doesn't move or select), long press + drag (1 s), trim on a selected clip (0.5 s for 30 px), no trim on an unselected clip, tap/swipe on empty space, ruler scrub, toolbar actions, Text opens the Edit panel and typing works, Media panel, thumbnails in the phone timeline, dragging text on the preview by touch, desktop layout still intact at full width.
+- Bugs found and fixed on the way: the Edit panel covered the video (now 55% high); a phone held sideways squashed the video to 49 px (now side by side); "fit timeline" ignored the header width change.
+- **Not tested on a real phone or tablet.** All touch tests used simulated touch events in desktop Chrome. Not tested: iOS Safari (the most important one), Android Chrome, the on-screen keyboard, real momentum feel, pinch on real hardware.
+- Known limits: inspector controls are desktop-sized (28 px rows), smaller than the 44 px touch guideline; no pinch to resize text on the preview; momentum isn't stopped when playback starts following the playhead.
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
 1. ~~Text layers.~~ Done.
 2. ~~Thumbnails and waveforms on clips.~~ Done.
-3. Phone layout and touch timeline (the editor shows a "coming next" notice on phones). Re-measure export smoothness there.
+3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
 4. A project list ("New project", open older projects), project file import/export.
 Then Phase 3 (transitions, filters and color, effects, audio tools, stickers, templates) and Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 

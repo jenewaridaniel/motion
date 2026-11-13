@@ -15,14 +15,14 @@ export function TopBar() {
   useEffect(() => setDraft(name), [name]);
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-line border-b bg-panel px-3">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-line border-b bg-panel px-2 sm:gap-3 sm:px-3">
       <a
         href={LANDING_URL}
         className="flex items-center gap-2 rounded-md pr-2"
         title="Motion home"
       >
         <Mark className="size-6 rounded-[6px]" />
-        <span className="font-semibold font-semiwide text-[14px] text-ink">
+        <span className="font-semibold font-semiwide text-[14px] text-ink max-sm:hidden">
           motion
         </span>
       </a>
@@ -35,7 +35,7 @@ export function TopBar() {
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
         }}
-        className="h-8 w-56 min-w-0 rounded-md bg-transparent px-2 text-ink-soft outline-none transition-colors hover:bg-panel-2 focus:bg-panel-2 focus:text-ink"
+        className="h-8 w-56 min-w-0 max-sm:flex-1 rounded-md bg-transparent px-2 text-ink-soft outline-none transition-colors hover:bg-panel-2 focus:bg-panel-2 focus:text-ink"
       />
       <SaveIndicator />
       <span className="ml-auto hidden text-[11px] text-ink-faint lg:block">
@@ -90,7 +90,7 @@ function SaveIndicator() {
         aria-hidden="true"
         className={`size-1.5 rounded-full ${problem ? "bg-danger" : save.kind === "saving" ? "animate-pulse bg-ink-faint" : "bg-clip-audio"}`}
       />
-      {text}
+      <span className="max-sm:sr-only">{text}</span>
     </output>
   );
 }

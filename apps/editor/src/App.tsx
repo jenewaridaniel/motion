@@ -1,9 +1,11 @@
 import { frameTime, projectDuration, rootComposition, US } from "@motion/core";
 import { useEffect, useState } from "react";
+import { BottomBar, type SheetName } from "./components/BottomBar.tsx";
 import { ExportDialog } from "./components/ExportDialog.tsx";
 import { Inspector } from "./components/Inspector.tsx";
 import { MediaBin } from "./components/MediaBin.tsx";
 import { Preview } from "./components/Preview.tsx";
+import { Sheet } from "./components/Sheet.tsx";
 import {
   deleteSelection,
   splitAtPlayhead,
@@ -11,6 +13,7 @@ import {
 } from "./components/Timeline.tsx";
 import { TopBar } from "./components/TopBar.tsx";
 import { engine } from "./lib/engine.ts";
+import { useCompact, useShort } from "./lib/useCompact.ts";
 import { importFiles } from "./state/media.ts";
 import { useEditor } from "./state/store.ts";
 
@@ -163,28 +166,6 @@ function Toasts() {
   );
 }
 
-/** Desktop and tablet only for now; the phone layout is part of the editor UI step. */
-function NarrowNotice() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center sm:hidden">
-      <img
-        src={`${import.meta.env.BASE_URL}icon.svg`}
-        alt=""
-        width={48}
-        height={48}
-        className="rounded-xl"
-      />
-      <p className="max-w-[28ch] font-semibold font-semiwide text-[17px] text-ink">
-        The phone layout is coming next.
-      </p>
-      <p className="max-w-[34ch] text-ink-soft">
-        For now, open Motion on a tablet or computer, or turn your phone
-        sideways.
-      </p>
-    </div>
-  );
-}
-
 function Restoring() {
   const restoring = useEditor((s) => s.restoring);
   if (!restoring) return null;
@@ -198,23 +179,60 @@ function Restoring() {
 export function App() {
   useShortcuts();
   const dropping = useWindowDrop();
+  const compact = useCompact();
+  const short = useShort();
+  const [sheet, setSheet] = useState<SheetName | null>(null);
 
   return (
     <>
-      <NarrowNotice />
-      <div className="hidden h-full flex-col max-sm:landscape:flex sm:flex">
-        <TopBar />
-        <div className="flex min-h-0 flex-1">
-          <div className="hidden lg:flex">
+      {compact ? (
+        <div className="flex h-dvh flex-col">
+          <TopBar />
+          {short ? (
+            // Phone held sideways: side by side, so the video isn't squashed.
+            <div className="flex min-h-0 flex-1">
+              <Preview />
+              <div className="flex min-w-0 flex-1 border-line border-l">
+                <Timeline fill />
+              </div>
+            </div>
+          ) : (
+            <>
+              <Preview />
+              <Timeline />
+            </>
+          )}
+          <BottomBar onOpen={setSheet} />
+        </div>
+      ) : (
+        <div className="flex h-dvh flex-col">
+          <TopBar />
+          <div className="flex min-h-0 flex-1">
             <MediaBin />
-          </div>
-          <Preview />
-          <div className="hidden md:flex">
+            <Preview />
             <Inspector />
           </div>
+          <Timeline />
         </div>
-        <Timeline />
-      </div>
+      )}
+      {compact && (
+        <>
+          <Sheet
+            title="Media"
+            open={sheet === "media"}
+            onClose={() => setSheet(null)}
+          >
+            <MediaBin inSheet />
+          </Sheet>
+          <Sheet
+            title="Edit"
+            open={sheet === "edit"}
+            onClose={() => setSheet(null)}
+          >
+            <Inspector inSheet />
+          </Sheet>
+        </>
+      )}
       {dropping && (
         <div className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-wine/40 backdrop-blur-[2px]">
           <p className="rounded-full bg-panel px-6 py-3 font-semibold text-ink shadow-2xl">

@@ -24,12 +24,16 @@ import { Diamond } from "./icons.tsx";
 import { NumberField } from "./NumberField.tsx";
 import { TextInspector } from "./TextInspector.tsx";
 
-export function Inspector() {
+export function Inspector({ inSheet = false }: { inSheet?: boolean }) {
   const sel = useSelectedLayer();
   return (
     <aside
       aria-label="Inspector"
-      className="scroll-thin flex w-72 shrink-0 flex-col overflow-y-auto border-line border-l bg-panel"
+      className={
+        inSheet
+          ? "flex flex-col bg-panel"
+          : "scroll-thin flex w-72 shrink-0 flex-col overflow-y-auto border-line border-l bg-panel"
+      }
     >
       {sel ? <LayerInspector layer={sel} /> : <ProjectSettings />}
     </aside>

@@ -10,7 +10,7 @@ import {
   VideoIcon,
 } from "./icons.tsx";
 
-export function MediaBin() {
+export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
   const assets = useEditor((s) => s.project.assets);
   // Re-render when a missing file is reconnected (hasMedia changes).
   useEditor((s) => s.mediaVersion);
@@ -22,7 +22,11 @@ export function MediaBin() {
   return (
     <aside
       aria-label="Media"
-      className="flex w-64 shrink-0 flex-col border-line border-r bg-panel"
+      className={
+        inSheet
+          ? "flex min-h-64 flex-col bg-panel"
+          : "flex w-64 shrink-0 flex-col border-line border-r bg-panel"
+      }
     >
       <div className="flex items-center justify-between border-line-soft border-b px-4 py-3">
         <h2 className="font-semibold text-ink">Media</h2>
@@ -76,7 +80,7 @@ export function MediaBin() {
                   </span>
                 )}
               </span>
-              <span className="flex opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+              <span className="flex opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                 <button
                   type="button"
                   title="Add to timeline"

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "gen:fonts": "node scripts/gen-fonts.mjs"
+    "gen:fonts": "node scripts/gen-fonts.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "5.3.0",
@@ -63,6 +64,7 @@
     "@vitejs/plugin-react": "6.3.0",
     "tailwindcss": "4.3.5",
     "typescript": "5.9.3",
-    "vite": "8.3.8"
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
   }
 }

@@ -56,8 +56,11 @@ export function Preview() {
       aria-label="Preview"
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-bg"
     >
-      <div ref={wrapRef} className="relative min-h-0 flex-1 p-4 [contain:size]">
-        <div className="absolute inset-4 flex items-center justify-center">
+      <div
+        ref={wrapRef}
+        className="relative min-h-0 flex-1 p-2 [contain:size] lg:p-4"
+      >
+        <div className="absolute inset-2 flex items-center justify-center lg:inset-4">
           <div className="relative" style={{ width: box.w, height: box.h }}>
             <canvas
               ref={canvasRef}
