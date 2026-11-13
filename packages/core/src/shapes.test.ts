@@ -19,6 +19,7 @@ import {
 } from "./model.ts";
 import { parseProject } from "./serialize.ts";
 import {
+  gradientLine,
   type PathCommand,
   SHAPE_KINDS,
   SHAPES,
@@ -188,5 +189,44 @@ describe("adding shapes and stickers", () => {
     const badFill = structuredClone(p);
     (shapes(badFill)[0]!.style as { fill: unknown }).fill = "red";
     expect(parseProject(badFill).ok).toBe(false);
+  });
+});
+
+describe("gradient fills", () => {
+  it("run across the whole shape at any angle", () => {
+    // 0°: left to right; 90°: top to bottom.
+    for (const [i, v] of gradientLine(200, 100, 0).entries()) {
+      expect(v).toBeCloseTo([-100, 0, 100, 0][i]!, 9);
+    }
+    for (const [i, v] of gradientLine(200, 100, 90).entries()) {
+      expect(v).toBeCloseTo([0, -50, 0, 50][i]!, 9);
+    }
+    // Diagonal: the corners land exactly on the ends, so they get the full colours.
+    const [x0, y0, x1, y1] = gradientLine(200, 100, 45);
+    const along = (x: number, y: number) =>
+      ((x - x0) * (x1 - x0) + (y - y0) * (y1 - y0)) /
+      ((x1 - x0) ** 2 + (y1 - y0) ** 2);
+    expect(along(-100, -50)).toBeCloseTo(0, 9);
+    expect(along(100, 50)).toBeCloseTo(1, 9);
+  });
+
+  it("are saved and checked on load", () => {
+    const h = new History();
+    let id = "";
+    const p = h.apply(createProject(), (d) => {
+      id = addShape(d, SHAPES[0]!, 0);
+      setShapeStyle(d, id, { gradient: { color: "#00ff88", angle: 30 } });
+    });
+    expect(shapes(p)[0]!.style.gradient).toEqual({
+      color: "#00ff88",
+      angle: 30,
+    });
+    expect(parseProject(structuredClone(p)).ok).toBe(true);
+    const bad = structuredClone(p);
+    (shapes(bad)[0]!.style as unknown as { gradient: unknown }).gradient = {
+      color: "x",
+      angle: 0,
+    };
+    expect(parseProject(bad).ok).toBe(false);
   });
 });

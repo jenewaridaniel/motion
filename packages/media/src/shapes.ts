@@ -4,6 +4,7 @@
  * images are never changed afterwards.
  */
 import {
+  gradientLine,
   type ShapeKind,
   type ShapeStyle,
   shapePath,
@@ -68,7 +69,19 @@ export class ShapeRasterizer {
       else path.closePath();
     }
     if (style.fill) {
-      ctx.fillStyle = style.fill;
+      if (style.gradient) {
+        const [x0, y0, x1, y1] = gradientLine(
+          size[0],
+          size[1],
+          style.gradient.angle,
+        );
+        const g = ctx.createLinearGradient(x0, y0, x1, y1);
+        g.addColorStop(0, style.fill);
+        g.addColorStop(1, style.gradient.color);
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = style.fill;
+      }
       ctx.fill(path);
     }
     if (style.stroke && style.stroke.width > 0) {

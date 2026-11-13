@@ -204,7 +204,14 @@ function checkLayer(l: unknown, p: Obj): string | null {
       !isObj(st) ||
       !(st.fill === null || isColor(st.fill)) ||
       !strokeOk(st.stroke) ||
-      !isNum(st.radius)
+      !isNum(st.radius) ||
+      !(
+        st.gradient === undefined ||
+        st.gradient === null ||
+        (isObj(st.gradient) &&
+          isColor(st.gradient.color) &&
+          isNum(st.gradient.angle))
+      )
     ) {
       return `${where} is an invalid shape`;
     }

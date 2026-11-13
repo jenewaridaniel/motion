@@ -101,6 +101,43 @@ export function ShapeInspector({ layer }: { layer: ShapeLayer }) {
           onChange={(c) => set({ fill: c }, `shape-fill-${layer.id}`)}
           onDone={seal}
         />
+        {style.fill && (
+          <ColorRow
+            label="Gradient"
+            value={style.gradient?.color ?? null}
+            onToggle={(on) =>
+              set({ gradient: on ? { color: "#000000", angle: 90 } : null })
+            }
+            onChange={(c) =>
+              set(
+                { gradient: { color: c, angle: style.gradient?.angle ?? 90 } },
+                `shape-gradient-${layer.id}`,
+              )
+            }
+            onDone={seal}
+          />
+        )}
+        {style.fill && style.gradient && (
+          <NumberField
+            label="Angle"
+            value={style.gradient.angle}
+            unit="°"
+            precision={0}
+            onChange={(v, g) =>
+              set(
+                {
+                  gradient: {
+                    color: style.gradient?.color ?? "#000000",
+                    angle: v,
+                  },
+                },
+                g,
+              )
+            }
+            onCommit={seal}
+            trailing={<span className="size-7 shrink-0" />}
+          />
+        )}
         <ColorRow
           label="Outline"
           value={style.stroke?.color ?? null}

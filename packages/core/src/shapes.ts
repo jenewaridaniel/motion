@@ -45,6 +45,29 @@ export interface ShapeStyle {
   stroke: { color: string; width: number } | null;
   /** Corner rounding for rectangles and speech bubbles, in layer pixels. */
   radius: number;
+  /**
+   * Makes the fill a gradient: from `fill` to `color`, along `angle`
+   * degrees (0 = left to right, 90 = top to bottom). Needs a fill.
+   */
+  gradient?: { color: string; angle: number } | null;
+}
+
+/**
+ * Where a gradient at `angle` starts and ends in a `width` × `height` box
+ * centred on (0, 0): [x0, y0, x1, y1]. The line is long enough that the
+ * corners get the full start and end colours.
+ */
+export function gradientLine(
+  width: number,
+  height: number,
+  angle: number,
+): [number, number, number, number] {
+  const a = (angle * Math.PI) / 180;
+  const dx = Math.cos(a);
+  const dy = Math.sin(a);
+  // Half the box's extent along the direction.
+  const half = (Math.abs(dx) * width) / 2 + (Math.abs(dy) * height) / 2;
+  return [-dx * half, -dy * half, dx * half, dy * half];
 }
 
 export type PathCommand =
@@ -324,6 +347,18 @@ export const SHAPES: ShapePreset[] = [
     shape: "ellipse",
     size: [0.4, 0.4],
     style: { fill: null, stroke: { color: "#ffffff", width: 12 }, radius: 0 },
+  },
+  {
+    id: "gradient",
+    name: "Gradient card",
+    shape: "rect",
+    size: [0.6, 0.4],
+    style: {
+      fill: "#ff5f6d",
+      gradient: { color: "#ffc371", angle: 45 },
+      stroke: null,
+      radius: 28,
+    },
   },
   {
     id: "bar",
