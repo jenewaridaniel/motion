@@ -222,13 +222,21 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested on a real phone or tablet.** All touch tests used simulated touch events in desktop Chrome. Not tested: iOS Safari (the most important one), Android Chrome, the on-screen keyboard, real momentum feel, pinch on real hardware.
 - Known limits: inspector controls are desktop-sized (28 px rows), smaller than the 44 px touch guideline; no pinch to resize text on the preview; momentum isn't stopped when playback starts following the playhead.
 
+### Phase 2, step 4: project list (2026-11-13). Phase 2 complete.
+
+- Built: a Projects screen (grid button in the top bar; slide-up panel on phones) listing every project on the device with saved time, length, shape and clip count. New project, Open, Rename, Duplicate ("… copy", numbered), Delete (asks first; removes the project's files unless another project uses them; deleting the open project switches to the most recent other one). "Save as file" writes one `.motion` file (a standard ZIP: `project.json` plus every media and font file, ZIP64 above 4 GB, built from references so big media isn't copied into memory). "Open project file" (or Import / drag-and-drop) stores the files, then the project under a new id and a numbered name if the name is taken.
+- Tested by hand in Chrome (test copies on ports 5181 and 5182, so the user's 5180 project was untouched): rename, new, add a clip, switch both ways (86 ms, all files reopen), duplicate, delete the copy (shared files kept), delete the open project (its own file removed, switches to the other, reload opens it), save as file (13.2 MB, every file at its exact size, checksums match), open that file (identical content, new id), open a project file in an empty editor on 5182 ("another device": video plays, text draws, survives reload), a junk `.motion` refused, opening through Import, the phone-size panel. ZIP files pass macOS `unzip -t` and extract correctly with Finder's tool (`ditto`), including the ZIP64 form.
+- Bugs found and fixed: an opened project file kept its name, so two projects could share it (now numbered); the Projects window would have grabbed focus on every redraw and could cut a rename short.
+- **Not tested:** the real save dialog (a stand-in caught the file; the system dialog can't be driven from here); projects over 4 GB for real (ZIP64 tested with a forced small limit); Safari and Firefox (Safari has no save dialog, so it downloads); a second tab trying to manage projects (it's refused with a message, by design, but not exercised).
+- Known limits: media from projects you switched away from stays open in memory until reload; saving a big project reads every file once to checksum it (takes a while for many GB).
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
 1. ~~Text layers.~~ Done.
 2. ~~Thumbnails and waveforms on clips.~~ Done.
 3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
-4. A project list ("New project", open older projects), project file import/export.
+4. ~~A project list~~ Done. **Phase 2 is complete** (only the real-phone test is left, and needs the user).
 Then Phase 3 (transitions, filters and color, effects, audio tools, stickers, templates) and Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

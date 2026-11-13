@@ -19,6 +19,7 @@ import {
 } from "@motion/media";
 import { DEFAULT_FONT } from "../lib/fonts.ts";
 import { importFonts, isFontFile } from "./customFonts.ts";
+import { isProjectFile, openProjectFile } from "./projects.ts";
 import { loadMedia, saveMedia } from "./storage.ts";
 import { useEditor } from "./store.ts";
 
@@ -28,7 +29,7 @@ const handles = new Map<string, MediaHandle>();
 export const getHandle = (assetId: string) => handles.get(assetId);
 
 export const ACCEPT =
-  "video/*,audio/*,image/*,.mov,.mkv,.m4a,.mp3,.wav,.flac,.ogg,.srt,.vtt,.ttf,.otf,.woff,.woff2";
+  "video/*,audio/*,image/*,.mov,.mkv,.m4a,.mp3,.wav,.flac,.ogg,.srt,.vtt,.ttf,.otf,.woff,.woff2,.motion";
 
 /** Preset closest in shape to `w × h`. */
 function nearestAspect(w: number, h: number): AspectKey {
@@ -90,6 +91,10 @@ export async function importFiles(files: Iterable<File>): Promise<void> {
           await importFonts([file]);
           continue;
         }
+        if (isProjectFile(file)) {
+          await openProjectFile(file);
+          continue;
+        }
         const { asset, handle } = await probeFile(file);
         const { project, edit, playhead } = useEditor.getState();
 
@@ -142,6 +147,8 @@ export async function restoreMedia(assets: Asset[]): Promise<string[]> {
   const missing: string[] = [];
   await Promise.all(
     assets.map(async (asset) => {
+      // Already open (shared with the project we're switching from).
+      if (handles.has(asset.id)) return;
       try {
         const file = await loadMedia(asset.id);
         if (!file) throw new Error("not stored");

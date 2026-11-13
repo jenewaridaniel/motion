@@ -32,6 +32,7 @@ interface EditorState {
   importing: number;
   toasts: Toast[];
   exportOpen: boolean;
+  projectsOpen: boolean;
   /** True while the last project is being loaded on start. */
   restoring: boolean;
   save: SaveStatus;
@@ -52,6 +53,7 @@ interface EditorState {
   toast: (text: string, tone?: Toast["tone"]) => void;
   dismissToast: (id: number) => void;
   setExportOpen: (open: boolean) => void;
+  setProjectsOpen: (open: boolean) => void;
   setRestoring: (restoring: boolean) => void;
   setSave: (save: SaveStatus) => void;
   mediaChanged: () => void;
@@ -85,6 +87,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   importing: 0,
   toasts: [],
   exportOpen: false,
+  projectsOpen: false,
   restoring: true,
   save: { kind: "idle" },
   mediaVersion: 0,
@@ -115,6 +118,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   dismissToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   setExportOpen: (exportOpen) => set({ exportOpen }),
+  setProjectsOpen: (projectsOpen) => set({ projectsOpen }),
   setRestoring: (restoring) => set({ restoring }),
   setSave: (save) => set({ save }),
   mediaChanged: () => set((s) => ({ mediaVersion: s.mediaVersion + 1 })),

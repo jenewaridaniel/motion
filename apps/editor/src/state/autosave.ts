@@ -74,6 +74,48 @@ function claimTab(): Promise<boolean> {
   });
 }
 
+/**
+ * Make a stored project the one being edited: check it, reopen its files and
+ * fonts, and treat it as already saved. Returns the reason it can't be
+ * opened, or null when it opened.
+ */
+export async function adoptStoredProject(
+  raw: unknown,
+  savedAt: number,
+): Promise<string | null> {
+  const parsed = parseProject(raw);
+  if (!parsed.ok) return parsed.reason;
+  const store = useEditor.getState();
+  const [missing, missingFonts] = await Promise.all([
+    restoreMedia(Object.values(parsed.project.assets)),
+    restoreFonts(Object.values(parsed.project.fonts ?? {})),
+  ]);
+  store.loadProject(parsed.project);
+  lastSaved = parsed.project;
+  if (savedAt) markSaved(savedAt);
+  if (missingFonts.length > 0) {
+    store.toast(
+      `The font${missingFonts.length > 1 ? "s" : ""} ${missingFonts.join(", ")} couldn't be loaded, so that text uses a standard font. Add the font file again to fix it.`,
+      "error",
+    );
+  }
+  if (missing.length > 0) {
+    store.toast(
+      `${missing.join(", ")} couldn't be reopened. Import ${missing.length > 1 ? "them" : "it"} again to see ${missing.length > 1 ? "them" : "it"}.`,
+      "error",
+    );
+  }
+  return null;
+}
+
+/** Start editing a project that isn't stored yet, and store it straight away. */
+export async function adoptNewProject(project: Project): Promise<boolean> {
+  await flushSave();
+  useEditor.getState().loadProject(project);
+  lastSaved = project;
+  return saveProject(project);
+}
+
 /** Load the last project, then start saving changes. Call once on start. */
 export async function startAutosave(): Promise<void> {
   const store = useEditor.getState();
@@ -99,32 +141,12 @@ export async function startAutosave(): Promise<void> {
       );
     }
     if (raw !== null) {
-      const parsed = parseProject(raw.project);
-      if (parsed.ok) {
-        const [missing, missingFonts] = await Promise.all([
-          restoreMedia(Object.values(parsed.project.assets)),
-          restoreFonts(Object.values(parsed.project.fonts ?? {})),
-        ]);
-        store.loadProject(parsed.project);
-        lastSaved = parsed.project;
-        if (raw.savedAt) markSaved(raw.savedAt);
-        if (missingFonts.length > 0) {
-          store.toast(
-            `The font${missingFonts.length > 1 ? "s" : ""} ${missingFonts.join(", ")} couldn't be loaded, so that text uses a standard font. Add the font file again to fix it.`,
-            "error",
-          );
-        }
-        if (missing.length > 0) {
-          store.toast(
-            `${missing.join(", ")} couldn't be reopened. Import ${missing.length > 1 ? "them" : "it"} again to see ${missing.length > 1 ? "them" : "it"}.`,
-            "error",
-          );
-        }
-      } else {
+      const problem = await adoptStoredProject(raw.project, raw.savedAt);
+      if (problem) {
         // Leave the stored copy alone: the new project gets a new id, so
         // nothing overwrites it.
         store.toast(
-          `Couldn't open your last project because ${parsed.reason}. Starting a new one.`,
+          `Couldn't open your last project because ${problem}. Starting a new one.`,
           "error",
         );
       }

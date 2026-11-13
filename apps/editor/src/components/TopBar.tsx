@@ -11,6 +11,7 @@ export function TopBar() {
   const empty = useEditor((s) => projectDuration(s.project) === 0);
   const edit = useEditor((s) => s.edit);
   const setExportOpen = useEditor((s) => s.setExportOpen);
+  const setProjectsOpen = useEditor((s) => s.setProjectsOpen);
   const [draft, setDraft] = useState(name);
   useEffect(() => setDraft(name), [name]);
 
@@ -27,6 +28,28 @@ export function TopBar() {
         </span>
       </a>
       <div className="h-5 w-px bg-line" />
+      <button
+        type="button"
+        title="Your projects"
+        aria-label="Your projects"
+        onClick={() => setProjectsOpen(true)}
+        className="grid size-8 shrink-0 place-items-center rounded-md text-ink-soft transition-colors hover:bg-panel-2 hover:text-ink"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <rect x="2" y="2" width="5" height="5" rx="1" />
+          <rect x="9" y="2" width="5" height="5" rx="1" />
+          <rect x="2" y="9" width="5" height="5" rx="1" />
+          <rect x="9" y="9" width="5" height="5" rx="1" />
+        </svg>
+      </button>
       <input
         aria-label="Project name"
         value={draft}

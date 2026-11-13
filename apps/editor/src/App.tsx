@@ -1,10 +1,12 @@
 import { frameTime, projectDuration, rootComposition, US } from "@motion/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BottomBar, type SheetName } from "./components/BottomBar.tsx";
 import { ExportDialog } from "./components/ExportDialog.tsx";
 import { Inspector } from "./components/Inspector.tsx";
+import { CloseIcon } from "./components/icons.tsx";
 import { MediaBin } from "./components/MediaBin.tsx";
 import { Preview } from "./components/Preview.tsx";
+import { ProjectsPanel } from "./components/ProjectsPanel.tsx";
 import { Sheet } from "./components/Sheet.tsx";
 import {
   deleteSelection,
@@ -166,6 +168,61 @@ function Toasts() {
   );
 }
 
+function Projects({ compact }: { compact: boolean }) {
+  const open = useEditor((s) => s.projectsOpen);
+  const setOpen = useEditor((s) => s.setProjectsOpen);
+  const close = () => setOpen(false);
+  const dialog = useRef<HTMLDivElement>(null);
+  // Focus once when it opens (not on every render, which would steal focus
+  // from the rename box).
+  useEffect(() => {
+    if (open) dialog.current?.focus();
+  }, [open]);
+  if (compact) {
+    return (
+      <Sheet title="Projects" open={open} onClose={close}>
+        <ProjectsPanel onDone={close} />
+      </Sheet>
+    );
+  }
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-4"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Projects"
+        tabIndex={-1}
+        ref={dialog}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") close();
+        }}
+        className="scroll-thin flex max-h-[80vh] w-full max-w-lg flex-col overflow-y-auto rounded-xl border border-line bg-panel shadow-2xl outline-none"
+      >
+        <div className="flex h-12 shrink-0 items-center justify-between border-line-soft border-b pr-2 pl-4">
+          <h2 className="font-semibold font-semiwide text-[16px] text-ink">
+            Projects
+          </h2>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={close}
+            className="grid size-9 place-items-center rounded-md text-ink-soft hover:bg-raised hover:text-ink"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <ProjectsPanel onDone={close} />
+      </div>
+    </div>
+  );
+}
+
 function Restoring() {
   const restoring = useEditor((s) => s.restoring);
   if (!restoring) return null;
@@ -240,6 +297,7 @@ export function App() {
           </p>
         </div>
       )}
+      <Projects compact={compact} />
       <Restoring />
       <ExportDialog />
       <Toasts />

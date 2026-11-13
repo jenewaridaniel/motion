@@ -8,7 +8,11 @@
  * IndexedDB rather than OPFS: it stores files in every browser we target,
  * including older Safari, with one API for both projects and media.
  */
-import type { Project } from "@motion/core";
+import {
+  type Project,
+  type ProjectSummary,
+  projectSummary,
+} from "@motion/core";
 import { useEditor } from "./store.ts";
 
 const DB_NAME = "motion";
@@ -191,17 +195,130 @@ export async function loadCurrentProject(): Promise<{
   };
 }
 
+/** A stored project as saved (not yet checked), or null if there is none. */
+export async function loadProjectRecord(
+  id: string,
+): Promise<{ project: unknown; savedAt: number } | null> {
+  const record = await read<Partial<ProjectRecord>>("projects", id);
+  if (!record) return null;
+  return {
+    project: record.project ?? null,
+    savedAt: typeof record.savedAt === "number" ? record.savedAt : 0,
+  };
+}
+
+/**
+ * Store a project without making it the one that opens next (a duplicate,
+ * or a project file being opened). Throws if it can't be stored.
+ */
+export async function putProject(project: Project): Promise<void> {
+  if (!canSave())
+    throw new Error("Another tab is editing, so nothing can be saved here.");
+  await write(["projects"], (tx) => {
+    const record: ProjectRecord = { project, savedAt: Date.now() };
+    tx.objectStore("projects").put(record, project.id);
+  });
+}
+
+export async function setCurrentProject(id: string): Promise<void> {
+  if (!canSave()) return;
+  await write(["meta"], (tx) => {
+    tx.objectStore("meta").put(id, CURRENT);
+  });
+}
+
+/** Every stored project, most recently saved first. */
+export async function listProjects(): Promise<ProjectSummary[]> {
+  const db = await openDb();
+  const out: ProjectSummary[] = await new Promise((resolve, reject) => {
+    const rows: ProjectSummary[] = [];
+    const req = db
+      .transaction("projects", "readonly")
+      .objectStore("projects")
+      .openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) {
+        resolve(rows);
+        return;
+      }
+      const rec = c.value as Partial<ProjectRecord>;
+      const summary = projectSummary(
+        rec.project,
+        typeof rec.savedAt === "number" ? rec.savedAt : 0,
+      );
+      // The key is the id, even when the record itself is damaged.
+      rows.push({ ...summary, id: String(c.key) });
+      c.continue();
+    };
+    req.onerror = () =>
+      reject(req.error ?? new Error("Couldn't read projects"));
+  });
+  return out.sort((a, b) => b.savedAt - a.savedAt);
+}
+
+/** Ids a stored project uses in the media store: its media and its fonts. */
+function filesOf(record: unknown): string[] {
+  const p = (record as { project?: { assets?: unknown; fonts?: unknown } })
+    ?.project;
+  const ids: string[] = [];
+  for (const list of [p?.assets, p?.fonts]) {
+    if (list && typeof list === "object") ids.push(...Object.keys(list));
+  }
+  return ids;
+}
+
+/**
+ * Delete a project for good, with the stored files that no other project
+ * uses. Returns how many files were removed.
+ */
+export async function deleteProject(id: string): Promise<number> {
+  if (!canSave())
+    throw new Error("Another tab is editing, so nothing can be changed here.");
+  let removed = 0;
+  await write(["projects", "media", "meta"], (tx) => {
+    const projects = tx.objectStore("projects");
+    const getReq = projects.get(id);
+    getReq.onsuccess = () => {
+      const own = filesOf(getReq.result);
+      const used = new Set<string>();
+      const cursor = projects.openCursor();
+      cursor.onsuccess = () => {
+        const c = cursor.result;
+        if (c) {
+          if (String(c.key) !== id)
+            for (const f of filesOf(c.value)) used.add(f);
+          c.continue();
+          return;
+        }
+        // Only now, with every other project read, remove what's unused.
+        projects.delete(id);
+        for (const f of own) {
+          if (!used.has(f)) {
+            tx.objectStore("media").delete(f);
+            removed++;
+          }
+        }
+      };
+    };
+  });
+  return removed;
+}
+
 // ---------------------------------------------------------------- media
 
 let askedToPersist = false;
 
-/** Store an imported file. Runs in the background; the status shows progress. */
+/**
+ * Store an imported file. Usually run in the background (the status shows
+ * progress); returns whether it was stored, for callers that wait.
+ */
 export async function saveMedia(
   assetId: string,
   name: string,
   file: File,
-): Promise<void> {
-  if (!canSave()) return;
+): Promise<boolean> {
+  if (!canSave()) return false;
   state.pendingMedia++;
   publish();
   try {
@@ -215,10 +332,12 @@ export async function saveMedia(
       // Ask the browser not to clear Motion's storage when space runs low.
       void navigator.storage?.persist?.().catch(() => undefined);
     }
+    return true;
   } catch (err) {
     console.error("[motion] save media", err);
     state.unsavedMedia.set(assetId, name);
     useEditor.getState().toast(`${name}: ${describe(err)}`, "error");
+    return false;
   } finally {
     state.pendingMedia--;
     publish();
