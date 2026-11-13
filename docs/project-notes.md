@@ -331,7 +331,7 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 
 - Phase 2: complete (only the real-phone test is left, and it needs the user).
 - Phase 3: complete. A colour, looks and blend modes; B effects and masks; C LUTs; D transitions (with sound crossfades); E audio tools; F shapes and stickers; G restyle captions and canvas handles; H templates.
-- Phase 4: ready-to-host site, installable app and browser check done. Left: going online (needs your Cloudflare login, and \"push\" for automatic updates), testing on real Safari/Firefox/phones, the public name, ProRes.
+- Phase 4: ready-to-host site, installable app and browser check done. Left: going online (needs your Cloudflare login, and "push" for automatic updates), testing on real Safari/Firefox/phones, the public name, ProRes.
 - Waiting on the user: a real-phone test; saying "push" to send the local commits to GitHub.
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; automated tests cover `core` and a few editor helpers (gestures, ZIP files, template fonts), not the renderer or the UI.
