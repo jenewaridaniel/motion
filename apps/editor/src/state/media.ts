@@ -1,16 +1,21 @@
 import {
   ASPECTS,
   type AspectKey,
+  type Asset,
   addAsset,
   appendAsset,
+  isSameMedia,
   projectDuration,
   setAspect,
 } from "@motion/core";
 import {
+  disposeHandle,
   type MediaHandle,
   probeFile,
+  reopenFile,
   UnsupportedMediaError,
 } from "@motion/media";
+import { loadMedia, saveMedia } from "./storage.ts";
 import { useEditor } from "./store.ts";
 
 /** Live file handles by asset id. Not part of the (serialisable) project. */
@@ -44,16 +49,38 @@ function nearestAspect(w: number, h: number): AspectKey {
  * empty timeline sets the canvas shape, like CapCut's "Original".
  */
 export async function importFiles(files: Iterable<File>): Promise<void> {
-  const { setImporting, toast } = useEditor.getState();
+  const { setImporting, toast, restoring } = useEditor.getState();
   const list = [...files];
   if (list.length === 0) return;
+  if (restoring) {
+    // The restored project would replace anything added now.
+    toast("Still opening your project. Try again in a moment.");
+    return;
+  }
   setImporting(list.length);
   try {
     for (const file of list) {
       try {
         const { asset, handle } = await probeFile(file);
-        handles.set(asset.id, handle);
         const { project, edit, playhead } = useEditor.getState();
+
+        // The same file as one whose stored copy is missing: reconnect it,
+        // so the clips already on the timeline work again.
+        const missing = Object.values(project.assets).find(
+          (a) => !handles.has(a.id) && isSameMedia(a, asset, { name: true }),
+        );
+        if (missing) {
+          disposeHandle(handle);
+          handles.set(missing.id, await reopenFile(missing, file));
+          void saveMedia(missing.id, missing.name, file);
+          useEditor.getState().mediaChanged();
+          toast(`Reconnected ${missing.name}.`);
+          continue;
+        }
+
+        handles.set(asset.id, handle);
+        // Keep a copy on this device so the project survives a reload.
+        void saveMedia(asset.id, asset.name, file);
         const wasEmpty = projectDuration(project) === 0;
         edit((d) => {
           addAsset(d, asset);
@@ -77,3 +104,27 @@ export async function importFiles(files: Iterable<File>): Promise<void> {
     useEditor.getState().seal();
   }
 }
+
+/**
+ * Reopen the stored files for a restored project. Returns the names of assets
+ * whose files are missing or no longer match; their clips show as empty.
+ */
+export async function restoreMedia(assets: Asset[]): Promise<string[]> {
+  const missing: string[] = [];
+  await Promise.all(
+    assets.map(async (asset) => {
+      try {
+        const file = await loadMedia(asset.id);
+        if (!file) throw new Error("not stored");
+        handles.set(asset.id, await reopenFile(asset, file));
+      } catch (err) {
+        console.warn("[motion] restore media", asset.name, err);
+        missing.push(asset.name);
+      }
+    }),
+  );
+  return missing;
+}
+
+/** Whether an asset's file is open and playable. */
+export const hasMedia = (assetId: string) => handles.has(assetId);

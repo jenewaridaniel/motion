@@ -2,7 +2,7 @@
 
 A CapCut-style video editor, free for everyone, running in the browser.
 This file records our planning conversation so we can pick it up any time.
-Status: **landing page built, editor first slice working (2026-11-13).**
+Status: **landing page built, editor first slice working, autosave added (2026-11-13).**
 
 ---
 
@@ -144,6 +144,7 @@ My notes:
 - `PRODUCT.md` and `DESIGN.md` written at the repo root. Some PRODUCT.md answers are marked as assumptions to confirm.
 - Fonts chosen: Archivo (width axis) and Bodoni Moda Italic. Palette: blush paper, wine and a coral "flare" accent.
 - The editor CTA currently points at `#start` (set in `apps/landing/lib/site.ts`).
+- The landing navbar keeps its desktop layout and provides a touch-friendly mobile menu with section links and the editor CTA. Manually verified at 320px and 390px (including open, close and link navigation) and at 1024px (desktop layout).
 
 ### Editor, first slice (2026-11-13)
 
@@ -155,14 +156,29 @@ My notes:
 - Review on 2026-11-13 fixed: start-edge trim on the main track over-trimming, reorder not letting a long clip go first, playhead left past the end after a delete, Space re-pressing the last clicked button.
 - Landing "Start editing" now opens the editor. Dev port is **5180** (5173 is used by another local project).
 
+### Autosave (2026-11-13)
+
+- Built: the project and every imported file are kept in the browser (IndexedDB) and come back after a reload. Details in `docs/architecture.md` → Autosave.
+- Tested by hand in Chrome (full reloads, state checked through `window.__motion` and by reading IndexedDB directly):
+  - import 3 files → project and all 3 files stored; top bar says "Saved on this device"
+  - rename, split, scale keyframe → reload → project identical, all files open, preview correct, playback and export work
+  - delete a clip then reload instantly → the change was kept (saved as the page closed)
+  - second tab → shows "Open in another tab: not saving"; its edit never reached storage
+  - stored file removed → clear message, clip kept, media list says "File missing"; importing the same file reconnects it, and it survives another reload
+  - project marked as a newer version → clear message, new empty project, old one kept untouched
+  - import then undo → after reload the unused stored copy is removed, the project's files are kept
+- **Not tested:** a save failing (disk full) and being retried; a "Leave site?" warning while a large file is still being copied (built; with small test files the copy finished too fast to catch); browsers without storage (some private windows); Safari and Firefox; very large files (several GB).
+- Known limits: if a saved project can't be opened, it is kept in storage but there is no screen to get it back yet; once you edit the new project, the old one is no longer the one that opens. There is one project only, with no "New project" button, so starting over means deleting clips by hand.
+
 ## 12. Next step
 
 1. Put the project under version control (`git init`). There is no history or backup yet.
-2. Persistence: autosave the project (IndexedDB) and media (OPFS) so a refresh doesn't lose work.
+2. Text layers (asked for next).
 3. Export quality: set our own bitrates (the library's "High" is about 6 Mbps at 1080p and ignores frame rate).
 4. Move export into a worker so the UI stays smooth.
 5. Phone layout and touch timeline (the editor shows a "coming next" notice on phones).
 6. Decide where the editor is hosted. The landing button points at `/app/` in production, and nothing is deployed there yet.
-7. Thumbnails and waveforms on clips, text layers, transitions and effects.
+7. A project list ("New project", open older projects), project file import/export.
+8. Thumbnails and waveforms on clips, transitions and effects.
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

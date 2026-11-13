@@ -55,10 +55,19 @@ Every change goes through `History.apply(project, recipe, mergeKey?)`. That uses
 - **Reading**: Mediabunny `Input` over the user's `File`. Video frames come from a `CanvasSink` (rotation handled) through a `VideoReader`. It walks forward during playback and seeks on jumps. Each timeline layer gets its own reader, so two clips from the same file don't fight.
 - **Export**: Mediabunny `Output` + `Mp4OutputFormat`. Video uses `CanvasSource` (H.264 or HEVC, checked with `canEncodeVideo` for the chosen size). Audio uses `AudioBufferSource` (AAC, with Opus as fallback), mixed in 2 s chunks and interleaved with the video. If the browser has `showSaveFilePicker`, the file streams straight to disk (`StreamTarget`). Otherwise it is built in memory and downloaded. **No watermark exists in the code path.**
 
+## Autosave
+
+- **Where:** IndexedDB, database `motion`, stores `projects` (by project id), `media` (each imported File, by asset id) and `meta` (`currentProjectId`). IndexedDB rather than OPFS because it stores files in every browser we target with one API. Nothing leaves the device.
+- **Saving:** `apps/editor/src/state/autosave.ts` saves 400 ms after the last change, one save at a time, and again when the tab is hidden or closed. Files are copied in the background when imported; the top bar shows Saving / Saved / Not saved.
+- **Restoring:** on start, the saved project goes through `core.parseProject` (shape and version check) before loading. Each file is reopened with `media.reopenFile`, which refuses a copy that doesn't match (`core.isSameMedia`). A missing file leaves its clips in place; importing the same file again reconnects them.
+- **One tab saves:** a Web Lock (`motion-editor`) is held by the first tab. Others open the project but don't save, and say so.
+- **Cleanup:** at startup (while imports are blocked), stored files that no saved project uses are deleted. They come from undone imports.
+- **Not saved:** undo history, selection, playhead, zoom.
+
 ## Not built yet (in order)
 
 1. Move preview decoding and export into a worker (Comlink plus OffscreenCanvas) so the UI never stutters during export.
-2. Persistence: media in OPFS, project in IndexedDB (Dexie), autosave, and import/export of the project file.
+2. Project file import/export (to move a project between devices) and a project list.
 3. Render-to-texture in the compositor: nested-comp clipping, group opacity, effects, masks, blend modes, transitions.
 4. Text and shape layers, the graph editor, motion paths on the canvas.
 5. Device-adaptive export presets, proxies, ProRes (WASM).

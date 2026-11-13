@@ -1,5 +1,6 @@
 import { projectDuration, renameProject } from "@motion/core";
 import { useEffect, useState } from "react";
+import type { SaveStatus } from "../state/storage.ts";
 import { useEditor } from "../state/store.ts";
 import { ExportIcon, Mark } from "./icons.tsx";
 
@@ -36,7 +37,8 @@ export function TopBar() {
         }}
         className="h-8 w-56 min-w-0 rounded-md bg-transparent px-2 text-ink-soft outline-none transition-colors hover:bg-panel-2 focus:bg-panel-2 focus:text-ink"
       />
-      <span className="ml-auto hidden text-[11px] text-ink-faint md:block">
+      <SaveIndicator />
+      <span className="ml-auto hidden text-[11px] text-ink-faint lg:block">
         Nothing is uploaded. Your files stay on this device.
       </span>
       <button
@@ -49,5 +51,46 @@ export function TopBar() {
         Export
       </button>
     </header>
+  );
+}
+
+const SAVE_TEXT: Record<SaveStatus["kind"], string> = {
+  idle: "",
+  saving: "Saving…",
+  saved: "Saved on this device",
+  error: "Not saved",
+  blocked: "Open in another tab: not saving",
+  unavailable: "Can't save in this window",
+};
+
+function SaveIndicator() {
+  const save = useEditor((s) => s.save);
+  const text = SAVE_TEXT[save.kind];
+  if (!text) return null;
+  const problem =
+    save.kind === "error" ||
+    save.kind === "blocked" ||
+    save.kind === "unavailable";
+  const title =
+    save.kind === "error"
+      ? save.message
+      : save.kind === "blocked"
+        ? "Motion is already open in another tab. Close this one and keep working there, so the two don't overwrite each other."
+        : save.kind === "unavailable"
+          ? "This browser window has no storage (for example, some private windows). Your work will be lost when you close it."
+          : save.kind === "saved"
+            ? `Last saved ${new Date(save.at).toLocaleTimeString()}`
+            : undefined;
+  return (
+    <output
+      title={title}
+      className={`flex shrink-0 items-center gap-1.5 text-[11px] ${problem ? "text-danger" : "text-ink-faint"}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`size-1.5 rounded-full ${problem ? "bg-danger" : save.kind === "saving" ? "animate-pulse bg-ink-faint" : "bg-clip-audio"}`}
+      />
+      {text}
+    </output>
   );
 }

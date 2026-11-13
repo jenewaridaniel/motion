@@ -1,6 +1,6 @@
 import { addOverlay, appendAsset, formatSeconds } from "@motion/core";
 import { useRef } from "react";
-import { ACCEPT, importFiles } from "../state/media.ts";
+import { ACCEPT, hasMedia, importFiles } from "../state/media.ts";
 import { useEditor } from "../state/store.ts";
 import {
   ImageIcon,
@@ -12,6 +12,8 @@ import {
 
 export function MediaBin() {
   const assets = useEditor((s) => s.project.assets);
+  // Re-render when a missing file is reconnected (hasMedia changes).
+  useEditor((s) => s.mediaVersion);
   const importing = useEditor((s) => s.importing);
   const edit = useEditor((s) => s.edit);
   const input = useRef<HTMLInputElement>(null);
@@ -63,10 +65,16 @@ export function MediaBin() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-ink">{a.name}</span>
-                <span className="tabular block text-[11px] text-ink-faint">
-                  {a.kind === "image" ? "Photo" : formatSeconds(a.duration)}
-                  {a.width > 0 && ` · ${a.width}×${a.height}`}
-                </span>
+                {hasMedia(a.id) ? (
+                  <span className="tabular block text-[11px] text-ink-faint">
+                    {a.kind === "image" ? "Photo" : formatSeconds(a.duration)}
+                    {a.width > 0 && ` · ${a.width}×${a.height}`}
+                  </span>
+                ) : (
+                  <span className="block text-[11px] text-danger">
+                    File missing. Import it again.
+                  </span>
+                )}
               </span>
               <span className="flex opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                 <button

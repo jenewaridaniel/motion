@@ -4,4 +4,5 @@ export * from "./history.ts";
 export * from "./matrix.ts";
 export * from "./model.ts";
 export * from "./property.ts";
+export * from "./serialize.ts";
 export * from "./time.ts";

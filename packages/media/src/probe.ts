@@ -1,4 +1,4 @@
-import { type Asset, newId, sec } from "@motion/core";
+import { type Asset, isSameMedia, newId, sec } from "@motion/core";
 import {
   ALL_FORMATS,
   AudioBufferSink,
@@ -28,11 +28,15 @@ function baseName(name: string) {
   return name.replace(/\.[^.]+$/, "");
 }
 
-/** Read a file's metadata and open it for decoding. */
+/**
+ * Read a file's metadata and open it for decoding. Pass `assetId` to reopen a
+ * file that is already in a project (after a reload); otherwise a new id is made.
+ */
 export async function probeFile(
   file: File,
+  assetId: string = newId(),
 ): Promise<{ asset: Asset; handle: MediaHandle }> {
-  const id = newId();
+  const id = assetId;
 
   if (file.type.startsWith("image/") || IMAGE_EXT.test(file.name)) {
     let image: ImageBitmap;
@@ -119,6 +123,26 @@ export async function probeFile(
       `${file.name} isn't a format we can open yet.`,
     );
   }
+}
+
+/**
+ * Reopen a saved file for an asset already in the project. Refuses a file that
+ * doesn't match what the project expects, so a wrong or damaged file can't
+ * silently play in place of the original.
+ */
+export async function reopenFile(
+  asset: Asset,
+  file: File,
+): Promise<MediaHandle> {
+  const { asset: found, handle } = await probeFile(file, asset.id);
+  const same = isSameMedia(found, asset);
+  if (!same) {
+    disposeHandle(handle);
+    throw new UnsupportedMediaError(
+      `The saved copy of ${asset.name} doesn't match the original.`,
+    );
+  }
+  return handle;
 }
 
 export function disposeHandle(h: MediaHandle): void {

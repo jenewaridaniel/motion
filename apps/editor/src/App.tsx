@@ -185,6 +185,16 @@ function NarrowNotice() {
   );
 }
 
+function Restoring() {
+  const restoring = useEditor((s) => s.restoring);
+  if (!restoring) return null;
+  return (
+    <output className="fixed inset-0 z-50 grid place-items-center bg-bg/90 text-ink-soft">
+      Opening your project…
+    </output>
+  );
+}
+
 export function App() {
   useShortcuts();
   const dropping = useWindowDrop();
@@ -212,6 +222,7 @@ export function App() {
           </p>
         </div>
       )}
+      <Restoring />
       <ExportDialog />
       <Toasts />
     </>

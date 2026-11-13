@@ -29,7 +29,7 @@ class Engine {
   constructor() {
     // Redraw when the project or playhead changes while paused.
     useEditor.subscribe((s, prev) => {
-      if (s.project !== prev.project) {
+      if (s.project !== prev.project || s.mediaVersion !== prev.mediaVersion) {
         if (s.playing) this.restartAudio(this.audio.time);
         this.request(s.playhead);
       } else if (!s.playing && s.playhead !== prev.playhead) {

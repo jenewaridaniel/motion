@@ -9,6 +9,7 @@ import {
   snapToFrame,
 } from "@motion/core";
 import { create } from "zustand";
+import type { SaveStatus } from "./storage.ts";
 
 /** Undo history lives outside React state; only the project snapshot goes in the store. */
 export const history = new History();
@@ -31,6 +32,11 @@ interface EditorState {
   importing: number;
   toasts: Toast[];
   exportOpen: boolean;
+  /** True while the last project is being loaded on start. */
+  restoring: boolean;
+  save: SaveStatus;
+  /** Bumps when a file is opened outside an edit (reconnecting a missing file). */
+  mediaVersion: number;
 
   /** Apply an edit. Pass the same `mergeKey` for every step of one gesture. */
   edit: (recipe: (draft: Project) => void, mergeKey?: string) => void;
@@ -46,6 +52,11 @@ interface EditorState {
   toast: (text: string, tone?: Toast["tone"]) => void;
   dismissToast: (id: number) => void;
   setExportOpen: (open: boolean) => void;
+  setRestoring: (restoring: boolean) => void;
+  setSave: (save: SaveStatus) => void;
+  mediaChanged: () => void;
+  /** Replace the whole project (on restore). Clears undo history and selection. */
+  loadProject: (project: Project) => void;
 }
 
 let toastId = 0;
@@ -74,6 +85,9 @@ export const useEditor = create<EditorState>((set, get) => ({
   importing: 0,
   toasts: [],
   exportOpen: false,
+  restoring: true,
+  save: { kind: "idle" },
+  mediaVersion: 0,
 
   edit: (recipe, mergeKey) => {
     const next = history.apply(get().project, recipe, mergeKey);
@@ -101,6 +115,13 @@ export const useEditor = create<EditorState>((set, get) => ({
   dismissToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   setExportOpen: (exportOpen) => set({ exportOpen }),
+  setRestoring: (restoring) => set({ restoring }),
+  setSave: (save) => set({ save }),
+  mediaChanged: () => set((s) => ({ mediaVersion: s.mediaVersion + 1 })),
+  loadProject: (project) => {
+    history.clear();
+    set({ ...synced(project, 0), selection: null, playhead: 0 });
+  },
 }));
 
 /**
