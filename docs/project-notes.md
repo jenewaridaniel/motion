@@ -300,14 +300,19 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** handles with a real mouse (drags were sent as pointer events to the real handlers, with pointer capture stubbed); handles on a phone (touch areas are 24 px, below the 44 px guideline); scaling a clip that has a parent.
 - Known limits: corner handles scale evenly only (no stretching one side); no handles while playing.
 
+### Phase 3, stage H: templates (2026-11-13). Phase 3 complete.
+
+- Built: 6 templates, ready-made starting projects with no stock media: Bold title (16:9), Quote (1:1), Countdown (16:9), Name label (16:9, made to go over your own video), Story intro (9:16), Product promo (9:16, three slides). They're under "Start from a template" in the Projects panel; each card shows a real frame drawn by the renderer (the same code as preview and export). Picking one makes a new project, which is then an ordinary project to edit. `core/templates.ts` builds them from the normal edit functions; `addText` and `addShape` can now take a length and a position.
+- Tested: core tests (every template is a valid project of the right shape and length, everything on the canvas, every font it uses listed, fresh ids each time, the name label goes over a video); an editor test that every template font is one the editor ships. By hand (port 5181): the Projects panel shows all 6 cards with real pictures and the right fonts; clicked Story intro (new 9:16 project with its background, headline, star and button; the panel closes; undo history starts empty); made a Name label project and imported a video through the Import button (it goes underneath, the canvas stays 16:9, the label colour and accent read exactly right in a rendered frame); reload keeps it. Reference frames still identical after all of Phase 3.
+- Bugs found and fixed: square and vertical template pictures spilled over their cards; descriptions showed the top of a third line; the Import button was still cut off with the new tabs (it's now a full-width button at the top of the Media tab).
+- **Not tested:** every template opened by hand (two were: Story intro and Name label; all six are checked by the core tests and were seen as pictures); exporting a template project; templates on a phone.
+- Known limits: no template-specific "replace this" placeholders (you edit the text and import your own clips as usual); making the same template twice gives two projects with the same name, like "New project" does.
+
 ## 12. Next step
 
-Agreed order (Phase 2 next):
-1. ~~Text layers.~~ Done.
-2. ~~Thumbnails and waveforms on clips.~~ Done.
-3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
-4. ~~A project list~~ Done. **Phase 2 is complete** (only the real-phone test is left, and needs the user).
-Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. ~~E. audio tools~~ done. ~~F. shapes and stickers~~ done. ~~G. captions and canvas handles~~ done. Next: H. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
-Then Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
+- Phase 2: complete (only the real-phone test is left, and it needs the user).
+- Phase 3: complete. A colour, looks and blend modes; B effects and masks; C LUTs; D transitions (with sound crossfades); E audio tools; F shapes and stickers; G restyle captions and canvas handles; H templates.
+- Next: Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
+- Waiting on the user: a real-phone test; saying "push" to send the local commits to GitHub.
 
-Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.
+Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; automated tests cover `core` and a few editor helpers (gestures, ZIP files, template fonts), not the renderer or the UI.

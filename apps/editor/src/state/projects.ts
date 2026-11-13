@@ -7,6 +7,7 @@ import {
   duplicateProject,
   type Project,
   parseProject,
+  projectFromTemplate,
   reidProject,
   renameProject,
 } from "@motion/core";
@@ -83,6 +84,14 @@ export async function openProject(id: string): Promise<boolean> {
 export async function newProject(): Promise<void> {
   if (blocked()) return;
   await adoptNewProject(createProject());
+}
+
+/** Start a new project from a template, and switch to it. */
+export async function newProjectFromTemplate(id: string): Promise<void> {
+  if (blocked()) return;
+  const project = projectFromTemplate(id);
+  if (!project) return;
+  await adoptNewProject(project);
 }
 
 export async function duplicateProjectById(id: string): Promise<void> {

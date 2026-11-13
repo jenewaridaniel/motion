@@ -1,9 +1,17 @@
-import { formatSeconds, type ProjectSummary } from "@motion/core";
+import {
+  ASPECTS,
+  formatSeconds,
+  type ProjectSummary,
+  TEMPLATES,
+  type Template,
+} from "@motion/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { templatePreview } from "../lib/templatePreview.ts";
 import {
   deleteProjectById,
   duplicateProjectById,
   newProject,
+  newProjectFromTemplate,
   openProject,
   openProjectFile,
   PROJECT_FILE_EXT,
@@ -112,6 +120,11 @@ export function ProjectsPanel({ onDone }: { onDone: () => void }) {
           }}
         />
       </div>
+
+      <Templates
+        disabled={busy}
+        onPick={(id) => run(() => newProjectFromTemplate(id), true)}
+      />
 
       <ul aria-label="Projects" className="flex flex-col">
         {rows === null && (
@@ -248,6 +261,90 @@ function Action({
       className={`h-8 rounded-md px-2.5 text-[12px] transition-colors hover:bg-raised disabled:opacity-35 ${danger ? "text-danger" : "text-ink-soft hover:text-ink"}`}
     >
       {label}
+    </button>
+  );
+}
+
+/** Ready-made starting projects, with a picture of each. */
+function Templates({
+  disabled,
+  onPick,
+}: {
+  disabled: boolean;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <section
+      aria-label="Templates"
+      className="border-line-soft border-b px-4 py-3"
+    >
+      <h3 className="mb-2 font-semibold text-[11px] text-ink-soft">
+        Start from a template
+      </h3>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {TEMPLATES.map((t) => (
+          <TemplateCard
+            key={t.id}
+            template={t}
+            disabled={disabled}
+            onPick={() => onPick(t.id)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TemplateCard({
+  template: t,
+  disabled,
+  onPick,
+}: {
+  template: Template;
+  disabled: boolean;
+  onPick: () => void;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void templatePreview(t.id).then((url) => {
+      if (live) setSrc(url);
+    });
+    return () => {
+      live = false;
+    };
+  }, [t.id]);
+  const { width, height } = ASPECTS[t.aspect];
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onPick}
+      title={t.description}
+      aria-label={`${t.name} template: ${t.description}`}
+      className="group flex flex-col overflow-hidden rounded-lg bg-panel-2 text-left transition-colors hover:bg-raised disabled:opacity-50"
+    >
+      <span className="flex h-24 w-full items-center justify-center overflow-hidden bg-black/40">
+        {src ? (
+          <img
+            src={src}
+            alt=""
+            className="h-full w-auto max-w-full object-contain"
+            style={{ aspectRatio: `${width} / ${height}` }}
+          />
+        ) : (
+          <span className="h-16 w-16 animate-pulse rounded bg-raised" />
+        )}
+      </span>
+      <span className="flex items-baseline justify-between gap-2 px-2.5 pt-2">
+        <span className="truncate font-semibold text-ink">{t.name}</span>
+        <span className="shrink-0 text-[10px] text-ink-faint">{t.aspect}</span>
+      </span>
+      <span className="block px-2.5 pt-0.5 pb-2.5">
+        <span className="line-clamp-2 text-[11px] text-ink-faint leading-snug">
+          {t.description}
+        </span>
+      </span>
     </button>
   );
 }

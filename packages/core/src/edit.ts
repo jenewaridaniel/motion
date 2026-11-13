@@ -227,7 +227,13 @@ export function liftToOverlay(p: Project, layerId: Id): boolean {
 export function addText(
   p: Project,
   at: Micros,
-  opts: { text?: string; style?: Partial<TextStyle> } = {},
+  opts: {
+    text?: string;
+    style?: Partial<TextStyle>;
+    duration?: Micros;
+    /** Where its centre goes on the canvas (default: the middle). */
+    position?: Vec2;
+  } = {},
 ): Id | null {
   const comp = rootComposition(p);
   const layer = createTextLayer(
@@ -236,6 +242,9 @@ export function addText(
     opts.text,
     opts.style,
   );
+  if (opts.duration)
+    layer.duration = Math.max(frame(comp), Math.round(opts.duration));
+  if (opts.position) layer.transform.position.value = opts.position;
   const isTextTrack = (t: Track) =>
     t.kind === "visual" &&
     !t.magnetic &&
@@ -259,7 +268,16 @@ export function addText(
  * Add a shape or sticker at `at`, in the middle of the canvas. It goes on a
  * graphics track under any text tracks, so captions stay on top.
  */
-export function addShape(p: Project, preset: ShapePreset, at: Micros): Id {
+export function addShape(
+  p: Project,
+  preset: ShapePreset,
+  at: Micros,
+  opts: {
+    duration?: Micros;
+    /** Where its centre goes on the canvas (default: the middle). */
+    position?: Vec2;
+  } = {},
+): Id {
   const comp = rootComposition(p);
   const short = Math.min(comp.width, comp.height);
   const layer = createShapeLayer(
@@ -273,6 +291,9 @@ export function addShape(p: Project, preset: ShapePreset, at: Micros): Id {
     structuredClone(preset.style),
     preset.name,
   );
+  if (opts.duration)
+    layer.duration = Math.max(frame(comp), Math.round(opts.duration));
+  if (opts.position) layer.transform.position.value = opts.position;
   const isGraphics = (t: Track) =>
     t.kind === "visual" &&
     !t.magnetic &&

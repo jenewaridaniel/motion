@@ -54,14 +54,6 @@ export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => input.current?.click()}
-          className={`flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-wine px-3 font-semibold text-[12px] text-ink transition-colors hover:bg-wine-hi ${tab === "media" ? "" : "hidden"}`}
-        >
-          <PlusIcon width={13} height={13} />
-          Import
-        </button>
         <input
           ref={input}
           type="file"
@@ -78,6 +70,18 @@ export function MediaBin({ inSheet = false }: { inSheet?: boolean }) {
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
         {tab === "sounds" && <SoundEffects />}
         {tab === "shapes" && <ShapesPanel />}
+        {tab === "media" && (
+          <div className="px-2 pt-2">
+            <button
+              type="button"
+              onClick={() => input.current?.click()}
+              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-full bg-wine font-semibold text-[12px] text-ink transition-colors hover:bg-wine-hi"
+            >
+              <PlusIcon width={13} height={13} />
+              Import
+            </button>
+          </div>
+        )}
         <ul
           className={`flex flex-col gap-0.5 p-2 ${tab === "media" ? "" : "hidden"}`}
         >

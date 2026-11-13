@@ -59,6 +59,10 @@ Planned layer kinds, which slot into the same union: `solid`, `adjustment`. (`sh
 
 `ShapeLayer` (`kind: "shape"`) has a `shape` kind, a `size` in layer pixels and a `ShapeStyle` (fill, outline, corner radius). Like text, its layer space is centred on the shape. `core.shapePath` returns the outline as path commands; `media.ShapeRasterizer` draws them with Canvas 2D at output resolution (cached) and the editor turns them into SVG for thumbnails. Presets (`SHAPES`, `STICKERS`) give a size as a share of the canvas' short side.
 
+## Templates
+
+`core.TEMPLATES` lists ready-made starting projects; `core.projectFromTemplate(id)` builds one with the ordinary edit functions (text, shapes, animations, background), so the result is a normal project. The editor draws each card's picture with the real renderer (`lib/templatePreview.ts`), one at a time, and caches it.
+
 ## Working on the canvas
 
 `core/canvas.ts` hit-tests draws (topmost rectangle under a point, following rotation and scale) and turns a drag into a position change in the parent's space. It also has the handle maths: `scaleFromHandle` (even scale from distance to the anchor) and `angleStep` / `snapRotation` (rotation added up step by step). The engine keeps the last frame's draws and rectangles; `CanvasOverlay` sits over the preview for select, drag, centre snapping and the selection outline.
