@@ -1,45 +1,54 @@
-# Putting Motion online (Cloudflare Pages)
+# Putting Motion online (Netlify)
 
 Motion is a static website: the landing page at `/` and the editor at `/app/`.
 Nothing runs on a server and nothing is uploaded; every visitor's browser does
-the editing. Cloudflare Pages hosts it for free.
+the editing. Netlify hosts it for free.
 
 ## Build and check it on your computer first
 
 ```sh
 pnpm build:site      # builds everything into site/
-pnpm preview:site    # serves it like Cloudflare will: http://localhost:5190
+pnpm preview:site    # serves it the way the host will: http://localhost:5190
 ```
 
 `site/` is what goes online. `deploy/_headers` and `deploy/_redirects` are
-copied into it: security headers, a strict content policy for the editor
-(it may only run its own files; the microphone is allowed for voiceovers),
-long caching for files whose names contain a content hash, and `/app` →
-`/app/`.
+copied into it (Netlify reads both): security headers, a strict content policy
+for the editor (it may only run its own files; the microphone is allowed for
+voiceovers), long caching for files whose names contain a content hash,
+no-cache for the app page and service worker, and `/app` → `/app/`.
+`netlify.toml` tells Netlify how to build.
 
 ## Option A: automatic updates from GitHub (recommended)
 
 Needs the code on GitHub (say "push" first).
 
-1. Log in at dash.cloudflare.com (free account).
-2. **Workers & Pages → Create → Pages → Connect to Git.** Pick the repository.
-3. Settings:
-   - Framework preset: **None**
-   - Build command: `pnpm build:site`
-   - Build output directory: `site`
-   - Environment variable: `NODE_VERSION` = `22`
-4. **Save and Deploy.** You get an address like `motion-xxxx.pages.dev`.
-   Every push updates it; pushes to other branches get their own preview
+1. Log in at app.netlify.com.
+2. **Add new site → Import an existing project → GitHub.** Pick the
+   repository.
+3. Netlify reads `netlify.toml`, so the settings fill in by themselves:
+   build command `pnpm build:site`, publish directory `site`, Node 22.
+   Leave "Base directory" empty.
+4. **Deploy.** You get an address like `motion-xxxx.netlify.app`. Every push
+   to the main branch updates it; pull requests get their own preview
    addresses.
 
 ## Option B: upload from this computer (no GitHub needed)
 
 ```sh
 pnpm build:site
-npx wrangler pages deploy site --project-name motion
+npx netlify-cli deploy --dir=site            # a draft address to check first
+npx netlify-cli deploy --dir=site --prod     # the real address
 ```
 
-The first time, Wrangler opens the browser to log in to Cloudflare.
+The first time, it opens the browser to log in and asks which site to use
+(create a new one, or link an existing one).
+
+## Other hosts
+
+Cloudflare Pages reads the same `_headers` and `_redirects`: build command
+`pnpm build:site`, output directory `site`, environment variable
+`NODE_VERSION=22`. Vercel would need its own `vercel.json`; GitHub Pages
+can't set headers, so it isn't a good fit.
 
 ## Installable and offline
 
@@ -53,7 +62,7 @@ edit is interrupted by an update. App icons are drawn by
 
 ## Later
 
-- **Own domain:** in the Pages project, **Custom domains → Set up a domain**.
+- **Own domain:** in Netlify, **Domain management → Add a domain**.
   Decide the public name first (see project notes: "Motion" is a working name).
 - **ProRes export** will need two more headers on `/app/*`
   (`Cross-Origin-Opener-Policy: same-origin`,

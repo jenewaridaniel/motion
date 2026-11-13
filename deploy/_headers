@@ -1,4 +1,5 @@
-# Cloudflare Pages headers. Rules that match a path all apply.
+# Response headers (Netlify and Cloudflare Pages read this file). Every rule
+# that matches a path applies.
 
 /*
   X-Content-Type-Options: nosniff

@@ -1,5 +1,5 @@
 /**
- * Build the whole website into `site/`, ready to upload to Cloudflare Pages:
+ * Build the whole website into `site/`, ready to upload (Netlify):
  * the landing page at `/` and the editor at `/app/`.
  *
  *   pnpm build:site

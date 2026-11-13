@@ -1,2 +1,2 @@
-# Cloudflare Pages redirects.
+# Redirects (Netlify and Cloudflare Pages read this file).
 /app  /app/  301

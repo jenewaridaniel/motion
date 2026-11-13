@@ -1,5 +1,5 @@
 /**
- * Serve `site/` locally the way Cloudflare Pages will: same files, plus the
+ * Serve `site/` locally the way the host will: same files, plus the
  * rules in `_headers` and `_redirects`. For testing a build before upload.
  *
  *   pnpm preview:site      (http://localhost:5190)
@@ -29,7 +29,7 @@ const TYPES = {
   ".wasm": "application/wasm",
 };
 
-/** `/app/*` style patterns, as Cloudflare uses them. */
+/** `/app/*` style patterns, as Netlify and Cloudflare use them. */
 const matches = (pattern, path) =>
   new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`).test(path);
 

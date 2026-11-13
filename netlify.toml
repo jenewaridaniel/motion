@@ -1,0 +1,10 @@
+# Netlify: build the whole site (landing at /, editor at /app/) into site/.
+# Headers and redirects come from deploy/_headers and deploy/_redirects,
+# which the build copies into site/.
+
+[build]
+  command = "pnpm build:site"
+  publish = "site"
+
+[build.environment]
+  NODE_VERSION = "22"
