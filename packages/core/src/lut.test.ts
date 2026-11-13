@@ -3,6 +3,7 @@ import {
   addAsset,
   addLut,
   appendAsset,
+  removeLut,
   setLayerLut,
   setPropertyValue,
   splitLayer,
@@ -124,6 +125,34 @@ describe("LUTs on clips", () => {
     // Mid-animation, so the check above means something.
     expect(before).toBeGreaterThan(0.05);
     expect(before).toBeLessThan(0.95);
+  });
+
+  it("can be removed from the project, and from every clip using it", () => {
+    const { h, p: p0, id } = setup();
+    let second = "";
+    let p = h.apply(p0, (d) => {
+      second = appendAsset(d, "v") ?? "";
+      setLayerLut(d, second, "L1");
+      addLut(d, { id: "L2", name: "Other", fileName: "other.cube" });
+    });
+    let used = -1;
+    p = h.apply(p, (d) => {
+      used = removeLut(d, "L1");
+    });
+    expect(used).toBe(2);
+    expect(p.luts).toEqual({
+      L2: { id: "L2", name: "Other", fileName: "other.cube" },
+    });
+    const layers = rootComposition(p).tracks.flatMap((t) => t.layers);
+    expect(layers.every((l) => l.lut === undefined)).toBe(true);
+    expect(evaluateFrame(p, sec(1))[0]!.style.lut).toBeNull();
+    // Still a valid project, and undo brings everything back.
+    expect(parseProject(structuredClone(p)).ok).toBe(true);
+    const back = h.undo(p);
+    expect(back.luts?.L1).toBeDefined();
+    const restored = rootComposition(back).tracks.flatMap((t) => t.layers);
+    expect(restored.find((l) => l.id === id)?.lut?.id).toBe("L1");
+    expect(restored.find((l) => l.id === second)?.lut?.id).toBe("L1");
   });
 
   it("is saved and checked on load, including a LUT that's no longer in the project", () => {

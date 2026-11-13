@@ -97,6 +97,28 @@ export function addLut(p: Project, lut: LutAsset): void {
   p.luts[lut.id] = lut;
 }
 
+/**
+ * Remove a LUT from the project and from every layer using it (in every
+ * composition). Returns how many layers used it. The file stays stored until
+ * the startup cleanup, so undo can bring it back.
+ */
+export function removeLut(p: Project, lutId: Id): number {
+  if (!p.luts?.[lutId]) return 0;
+  delete p.luts[lutId];
+  let used = 0;
+  for (const comp of Object.values(p.compositions)) {
+    for (const track of comp.tracks) {
+      for (const layer of track.layers) {
+        if (layer.lut?.id === lutId) {
+          delete layer.lut;
+          used++;
+        }
+      }
+    }
+  }
+  return used;
+}
+
 /** Use a project LUT on a layer (full strength), or null to remove it. */
 export function setLayerLut(
   p: Project,

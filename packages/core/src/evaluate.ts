@@ -215,16 +215,16 @@ function drawLayer(
 ): void {
   const { p, out, shortSide } = ctx;
   // During a transition a clip is drawn a little before its start or after
-  // its end. Its settings hold their first / last values there; only the
-  // footage keeps moving (see `sourceTime` below).
-  const raw = t - layer.start;
-  const local = Math.min(Math.max(raw, 0), Math.max(0, layer.duration - 1));
+  // its end. Everything keeps running there as if the clip were longer:
+  // keyframes continue (and hold past their first / last one), effects keep
+  // moving, and the footage beyond the trim points is used.
+  const local = t - layer.start;
   const opacity =
     ctx.parentOpacity *
     clamp01(valueAt(layer.opacity, local)) *
     (side?.opacity ?? 1);
   if (opacity <= 0) return;
-  const own = worldMatrix(layer, layer.start + local, ctx.byId);
+  const own = worldMatrix(layer, t, ctx.byId);
   const matrix = withShake(
     layer,
     local,
@@ -248,7 +248,7 @@ function drawLayer(
     drawComposition(
       p,
       layer.compositionId,
-      Math.max(0, sourceTimeAt(layer, raw)),
+      Math.max(0, sourceTimeAt(layer, local)),
       matrix,
       opacity,
       `${key}/`,
@@ -259,7 +259,11 @@ function drawLayer(
   }
   if (layer.kind === "text") {
     if (layer.text.trim() === "") return;
-    const anim = textAnimationAt(layer, local);
+    // Text in / out animations are defined within the clip.
+    const anim = textAnimationAt(
+      layer,
+      Math.min(Math.max(local, 0), Math.max(0, layer.duration - 1)),
+    );
     const shown = opacity * anim.opacity;
     if (shown <= 0) return;
     // Animation scales and rotates around the anchor, and offsets in the
@@ -293,7 +297,7 @@ function drawLayer(
   // Footage beyond the trim points is used when a transition needs it;
   // where the file runs out, the first / last frame holds.
   const sourceTime = Math.min(
-    Math.max(0, sourceTimeAt(layer, raw)),
+    Math.max(0, sourceTimeAt(layer, local)),
     Math.max(0, asset.duration - 1),
   );
   const source: DrawSource =
@@ -323,6 +327,12 @@ export function evaluateFrame(
 
 // ---------------------------------------------------------------- audio
 
+/** A fade over [start, end) in root-composition time. */
+export interface AudioFade {
+  start: Micros;
+  end: Micros;
+}
+
 export interface AudioSegment {
   layerId: Id;
   assetId: Id;
@@ -332,12 +342,23 @@ export interface AudioSegment {
   /** Source time at `start`. */
   sourceIn: Micros;
   speed: number;
-  /** Volume property, sampled with time relative to `start`. */
+  /** Volume property; its keyframe times are relative to `layerStart`. */
   volume: Property<number>;
+  /** Where the clip starts (a transition can make its sound start earlier). */
+  layerStart: Micros;
+  /** Silent at `fadeIn.start`, full at `fadeIn.end`. */
+  fadeIn: AudioFade | null;
+  /** Full at `fadeOut.start`, silent at `fadeOut.end`. */
+  fadeOut: AudioFade | null;
 }
 
 /**
  * Every piece of audio in the root composition.
+ *
+ * At a transition on the main track the two clips' sound crossfades over
+ * the same window as the picture: the old clip plays on past the cut and
+ * the new one starts early, using the sound beyond the trim points. Where a
+ * file has no sound there, the fade fits into what exists.
  * TODO(nesting): include audio from nested compositions.
  */
 export function collectAudioSegments(
@@ -349,23 +370,106 @@ export function collectAudioSegments(
   const out: AudioSegment[] = [];
   for (const track of comp.tracks) {
     if (track.muted) continue;
-    for (const layer of track.layers) {
-      if (layer.kind !== "media") continue;
+    track.layers.forEach((layer, i) => {
+      if (layer.kind !== "media") return;
       const asset = p.assets[layer.assetId];
-      if (!asset?.hasAudio) continue;
-      if (isSilent(layer)) continue;
+      if (!asset?.hasAudio) return;
+      if (isSilent(layer)) return;
+      let start = layer.start;
+      let end = layerEnd(layer);
+      let sourceIn = layer.inPoint;
+      let fadeIn: AudioFade | null = null;
+      let fadeOut: AudioFade | null = null;
+      const prev = track.magnetic ? track.layers[i - 1] : undefined;
+      const next = track.magnetic ? track.layers[i + 1] : undefined;
+      if (prev && layer.transition) {
+        const half = Math.floor(
+          transitionLength(layer.transition, prev, layer) / 2,
+        );
+        if (half > 0) {
+          // Start early by up to half the transition, if the file has sound there.
+          const early = Math.min(half, Math.floor(layer.inPoint / layer.speed));
+          start = layer.start - early;
+          sourceIn = layer.inPoint - Math.round(early * layer.speed);
+          fadeIn = { start, end: layer.start + half };
+        }
+      }
+      if (next?.transition) {
+        const half = Math.floor(
+          transitionLength(next.transition, layer, next) / 2,
+        );
+        if (half > 0) {
+          const cut = layerEnd(layer);
+          // Where the file runs out, in timeline time.
+          const fileEnd =
+            layer.start + (asset.duration - layer.inPoint) / layer.speed;
+          end = cut + Math.max(0, Math.min(half, Math.floor(fileEnd - cut)));
+          fadeOut = { start: cut - half, end };
+        }
+      }
       out.push({
         layerId: layer.id,
         assetId: asset.id,
-        start: layer.start,
-        duration: layer.duration,
-        sourceIn: layer.inPoint,
+        start,
+        duration: end - start,
+        sourceIn,
         speed: layer.speed,
         volume: layer.volume,
+        layerStart: layer.start,
+        fadeIn,
+        fadeOut,
       });
-    }
+    });
   }
   return out;
+}
+
+const fadeAt = (f: AudioFade, t: Micros) =>
+  f.end <= f.start
+    ? t >= f.end
+      ? 1
+      : 0
+    : clamp01((t - f.start) / (f.end - f.start));
+
+/**
+ * Gain (0 to 2) of a segment at root-composition time `t`: its volume times
+ * any fades. Fades are equal-power, so a crossfade keeps the loudness steady.
+ */
+export function audioGainAt(seg: AudioSegment, t: Micros): number {
+  let g = Math.min(2, Math.max(0, valueAt(seg.volume, t - seg.layerStart)));
+  if (seg.fadeIn) g *= Math.sin((Math.PI / 2) * fadeAt(seg.fadeIn, t));
+  if (seg.fadeOut) g *= Math.cos((Math.PI / 2) * fadeAt(seg.fadeOut, t));
+  return g;
+}
+
+/**
+ * Gain over [from, to] as points to ramp between linearly: every `step`
+ * where the gain changes (keyframed volume, fades), and only the edges
+ * where it's flat.
+ */
+export function gainPoints(
+  seg: AudioSegment,
+  from: Micros,
+  to: Micros,
+  step: Micros,
+): [Micros, number][] {
+  const animated = !!seg.volume.keyframes?.length;
+  const fades = [seg.fadeIn, seg.fadeOut].filter((f): f is AudioFade => !!f);
+  const inFade = (t: Micros) => fades.some((f) => t >= f.start && t < f.end);
+  const edges = fades
+    .flatMap((f) => [f.start, f.end])
+    .filter((e) => e > from && e < to)
+    .sort((x, y) => x - y);
+  const points: [Micros, number][] = [[from, audioGainAt(seg, from)]];
+  let t = from;
+  while (t < to) {
+    const nextEdge = edges.find((e) => e > t) ?? to;
+    const next =
+      animated || inFade(t) ? Math.min(t + step, nextEdge) : nextEdge;
+    points.push([next, audioGainAt(seg, next)]);
+    t = next;
+  }
+  return points;
 }
 
 function isSilent(layer: MediaLayer): boolean {

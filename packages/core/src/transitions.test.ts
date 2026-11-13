@@ -4,12 +4,22 @@ import {
   appendAsset,
   deleteLayer,
   liftToOverlay,
+  setEffect,
+  setPropertyValue,
   setTransition,
   setTransitionDuration,
   splitLayer,
+  toggleKeyframe,
   trimLayer,
 } from "./edit.ts";
-import { evaluateFrame, projectDuration } from "./evaluate.ts";
+import {
+  audioGainAt,
+  collectAudioSegments,
+  evaluateFrame,
+  gainPoints,
+  layerMatrix,
+  projectDuration,
+} from "./evaluate.ts";
 import { History } from "./history.ts";
 import { apply } from "./matrix.ts";
 import {
@@ -19,11 +29,12 @@ import {
   type Project,
   rootComposition,
 } from "./model.ts";
+import { valueAt } from "./property.ts";
 import { parseProject } from "./serialize.ts";
 import { sec } from "./time.ts";
 import { TRANSITION_KINDS, transitionSides } from "./transitions.ts";
 
-const video = (id: string): Asset => ({
+const video = (id: string, hasAudio = false): Asset => ({
   id,
   kind: "video",
   name: id,
@@ -31,7 +42,7 @@ const video = (id: string): Asset => ({
   width: 1920,
   height: 1080,
   hasVideo: true,
-  hasAudio: false,
+  hasAudio,
 });
 
 const main = (p: Project) =>
@@ -42,12 +53,12 @@ const main = (p: Project) =>
  * Clip B: source 2–10 s at 8–16 s (2 s of spare footage before it).
  * Clip C: source 0–10 s at 16–26 s.
  */
-function setup() {
+function setup(withSound = false) {
   const h = new History();
   let p = h.apply(createProject(), (d) => {
-    addAsset(d, video("a"));
-    addAsset(d, video("b"));
-    addAsset(d, video("c"));
+    addAsset(d, video("a", withSound));
+    addAsset(d, video("b", withSound));
+    addAsset(d, video("c", withSound));
     appendAsset(d, "a");
     appendAsset(d, "b");
     appendAsset(d, "c");
@@ -211,6 +222,138 @@ describe("transitions", () => {
       }
       expect(end.to.blur, kind).toBe(0);
     }
+  });
+});
+
+describe("clips playing past their ends", () => {
+  it("the outgoing clip keeps animating instead of freezing", () => {
+    const { h, p: p0, a, b } = setup();
+    // Rotation keyframes run past A's trimmed end (8 s): 0° at 0 s, 20° at 10 s.
+    let p = h.apply(p0, (d) => {
+      toggleKeyframe(d, a, "transform.rotation", 0);
+      toggleKeyframe(d, a, "transform.rotation", sec(10));
+      setPropertyValue(d, a, "transform.rotation", 20, sec(10));
+      setEffect(d, a, "shake", true);
+      setTransition(d, b, "dissolve");
+      setTransitionDuration(d, b, sec(1));
+    });
+    const layerA = main(p)[0]!;
+    const rotationAt = (t: number) =>
+      valueAt(layerA.transform.rotation, sec(t));
+    expect(rotationAt(8.4)).toBeGreaterThan(rotationAt(8) + 0.1);
+    // Without shake, A's matrix at 8.4 s is exactly its keyframed transform.
+    p = h.apply(p, (d) => void setEffect(d, a, "shake", false));
+    expect(find(p, 8.4, a)!.matrix).toEqual(layerMatrix(main(p)[0]!, sec(8.4)));
+    // With shake, it keeps moving after the end (not frozen on one offset).
+    p = h.apply(p, (d) => void setEffect(d, a, "shake", true));
+    expect(find(p, 8.1, a)!.matrix).not.toEqual(find(p, 8.4, a)!.matrix);
+  });
+
+  it("the incoming clip holds its first values before its start", () => {
+    const { h, p: p0, b } = setup();
+    // B fades from 0.2 to 1 over its first second (keyframe times are timeline times).
+    const p = h.apply(p0, (d) => {
+      toggleKeyframe(d, b, "opacity", sec(8));
+      setPropertyValue(d, b, "opacity", 0.2, sec(8));
+      toggleKeyframe(d, b, "opacity", sec(9));
+      setPropertyValue(d, b, "opacity", 1, sec(9));
+      setTransition(d, b, "dissolve");
+      setTransitionDuration(d, b, sec(1));
+    });
+    // A quarter into the dissolve: 0.2 (held) × 0.25 (dissolve).
+    expect(find(p, 7.75, b)!.opacity).toBeCloseTo(0.05, 6);
+    // After the cut its own fade carries on as normal.
+    expect(find(p, 8.25, b)!.opacity).toBeGreaterThan(0.2);
+  });
+});
+
+describe("sound at transitions", () => {
+  function withDissolve(at: "b" | "c") {
+    const s = setup(true);
+    const id = at === "b" ? s.b : s.c;
+    const p = s.h.apply(s.p, (d) => {
+      setTransition(d, id, "dissolve");
+      setTransitionDuration(d, id, sec(1));
+    });
+    const segs = collectAudioSegments(p);
+    const seg = (layerId: string) => segs.find((x) => x.layerId === layerId)!;
+    return { ...s, p, segs, seg };
+  }
+
+  it("without transitions, sound is unchanged and never fades", () => {
+    const { p, a } = setup(true);
+    const s = collectAudioSegments(p).find((x) => x.layerId === a)!;
+    expect([s.start, s.duration, s.sourceIn]).toEqual([0, sec(8), 0]);
+    expect(s.fadeIn).toBeNull();
+    expect(s.fadeOut).toBeNull();
+    expect(audioGainAt(s, sec(7.99))).toBe(1);
+  });
+
+  it("crossfades over the transition, using the sound past the trim points", () => {
+    const { seg, a, b } = withDissolve("b");
+    // A keeps playing half a second past the cut, fading out.
+    expect([seg(a).start, seg(a).duration]).toEqual([0, sec(8.5)]);
+    expect(seg(a).fadeOut).toEqual({ start: sec(7.5), end: sec(8.5) });
+    // B starts half a second early (source 1.5 s), fading in.
+    expect([seg(b).start, seg(b).sourceIn, seg(b).duration]).toEqual([
+      sec(7.5),
+      sec(1.5),
+      sec(8.5),
+    ]);
+    expect(seg(b).fadeIn).toEqual({ start: sec(7.5), end: sec(8.5) });
+    // Silent at the outer edges, full inside the clips.
+    expect(audioGainAt(seg(b), sec(7.5))).toBeCloseTo(0, 6);
+    expect(audioGainAt(seg(a), sec(8.5))).toBeCloseTo(0, 6);
+    expect(audioGainAt(seg(a), sec(7))).toBe(1);
+    expect(audioGainAt(seg(b), sec(9))).toBe(1);
+  });
+
+  it("keeps the loudness steady: equal power all the way through", () => {
+    const { seg, a, b } = withDissolve("b");
+    for (let t = 7.5; t <= 8.5; t += 0.05) {
+      const ga = audioGainAt(seg(a), sec(t));
+      const gb = audioGainAt(seg(b), sec(t));
+      expect(ga * ga + gb * gb).toBeCloseTo(1, 6);
+    }
+  });
+
+  it("fits the fades into the sound that exists", () => {
+    // B ends at the end of its file; C starts at the start of its file.
+    const { seg, b, c } = withDissolve("c");
+    expect(seg(b).start + seg(b).duration).toBe(sec(16));
+    expect(seg(b).fadeOut).toEqual({ start: sec(15.5), end: sec(16) });
+    expect(seg(c).start).toBe(sec(16));
+    expect(seg(c).fadeIn).toEqual({ start: sec(16), end: sec(16.5) });
+    expect(audioGainAt(seg(b), sec(16))).toBeCloseTo(0, 6);
+    expect(audioGainAt(seg(c), sec(16))).toBeCloseTo(0, 6);
+  });
+
+  it("volume keyframes keep their timing when the sound starts early", () => {
+    const s = setup(true);
+    const p = s.h.apply(s.p, (d) => {
+      toggleKeyframe(d, s.b, "volume", sec(8));
+      setPropertyValue(d, s.b, "volume", 0.5, sec(8));
+      toggleKeyframe(d, s.b, "volume", sec(10));
+      setPropertyValue(d, s.b, "volume", 1.5, sec(10));
+      setTransition(d, s.b, "dissolve");
+      setTransitionDuration(d, s.b, sec(1));
+    });
+    const seg = collectAudioSegments(p).find((x) => x.layerId === s.b)!;
+    // At 10 s (2 s into B, past the fade) the volume is the keyframed 1.5.
+    expect(audioGainAt(seg, sec(10))).toBeCloseTo(1.5, 6);
+  });
+
+  it("gives the mixer points only where the gain changes", () => {
+    const { seg, a } = withDissolve("b");
+    const pts = gainPoints(seg(a), 0, sec(8.5), sec(0.02));
+    // Flat until the fade starts: one jump straight to 7.5 s.
+    expect(pts[0]).toEqual([0, 1]);
+    expect(pts[1]).toEqual([sec(7.5), 1]);
+    // Then fine steps through the fade, ending silent.
+    expect(pts.length).toBeGreaterThan(50);
+    expect(pts.at(-1)![0]).toBe(sec(8.5));
+    expect(pts.at(-1)![1]).toBeCloseTo(0, 6);
+    for (const [t, g] of pts) expect(g).toBeCloseTo(audioGainAt(seg(a), t), 9);
   });
 });
 

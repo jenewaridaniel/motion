@@ -3,6 +3,7 @@ import {
   type Layer,
   type Property,
   type PropertyPath,
+  removeLut,
   setLayerLut,
 } from "@motion/core";
 import { type ReactNode, useRef } from "react";
@@ -24,6 +25,7 @@ export function LutControl({ layer, at, set, kfButton }: Props) {
   const luts = useEditor((s) => s.project.luts);
   const edit = useEditor((s) => s.edit);
   const seal = useEditor((s) => s.seal);
+  const toast = useEditor((s) => s.toast);
   const fileInput = useRef<HTMLInputElement>(null);
   const list = Object.values(luts ?? {});
   const use = (id: string | null) =>
@@ -83,6 +85,27 @@ export function LutControl({ layer, at, set, kfButton }: Props) {
           onCommit={seal}
           trailing={kfButton("lut.intensity", "LUT strength")}
         />
+      )}
+      {layer.lut && luts?.[layer.lut.id] && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              const lut = layer.lut && luts?.[layer.lut.id];
+              if (!lut) return;
+              let used = 0;
+              edit((d) => {
+                used = removeLut(d, lut.id);
+              });
+              toast(
+                `Removed ${lut.name} from the project${used > 1 ? ` and ${used} clips` : ""}. Undo brings it back.`,
+              );
+            }}
+            className="h-6 rounded px-1.5 text-[11px] text-ink-faint hover:bg-raised hover:text-ink"
+          >
+            Remove LUT from project
+          </button>
+        </div>
       )}
     </>
   );

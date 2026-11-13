@@ -1,4 +1,4 @@
-import { type AudioSegment, type Micros, US, valueAt } from "@motion/core";
+import { type AudioSegment, gainPoints, type Micros, US } from "@motion/core";
 import type { MediaHandle } from "./probe.ts";
 
 type HandleLookup = (assetId: string) => MediaHandle | undefined;
@@ -21,17 +21,17 @@ function scheduleGain(
   to: Micros,
   toCtx: (t: Micros) => number,
 ) {
-  const at = (t: Micros) =>
-    Math.min(2, Math.max(0, valueAt(seg.volume, t - seg.start)));
-  if (!seg.volume.keyframes?.length) {
-    param.value = at(from);
+  const points = gainPoints(seg, from, to, GAIN_STEP);
+  const [first] = points;
+  if (!first) return;
+  if (points.every(([, g]) => g === first[1])) {
+    param.value = first[1];
     return;
   }
-  param.setValueAtTime(at(from), Math.max(0, toCtx(from)));
-  for (let t = from + GAIN_STEP; t < to; t += GAIN_STEP) {
-    param.linearRampToValueAtTime(at(t), Math.max(0, toCtx(t)));
+  param.setValueAtTime(first[1], Math.max(0, toCtx(first[0])));
+  for (const [t, g] of points.slice(1)) {
+    param.linearRampToValueAtTime(g, Math.max(0, toCtx(t)));
   }
-  param.linearRampToValueAtTime(at(to), Math.max(0, toCtx(to)));
 }
 
 /**
