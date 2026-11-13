@@ -7,3 +7,6 @@ dist
 *.log
 .env*.local
 *.tsbuildinfo
+
+# Built website (pnpm build:site)
+/site

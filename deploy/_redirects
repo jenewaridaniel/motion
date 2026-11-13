@@ -1,0 +1,2 @@
+# Cloudflare Pages redirects.
+/app  /app/  301
