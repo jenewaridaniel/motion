@@ -20,9 +20,11 @@ const VERT = `#version 300 es
 in vec2 a_unit;
 uniform mat3 u_matrix;
 out vec2 v_uv;
+out vec2 v_clip;
 void main() {
   v_uv = a_unit;
   vec3 p = u_matrix * vec3(a_unit, 1.0);
+  v_clip = p.xy;
   gl_Position = vec4(p.xy, 0.0, 1.0);
 }`;
 
@@ -33,6 +35,7 @@ void main() {
 const FRAG = `#version 300 es
 precision mediump float;
 in vec2 v_uv;
+in highp vec2 v_clip;
 uniform sampler2D u_tex;
 uniform float u_opacity;
 uniform bool u_adjust;
@@ -71,6 +74,11 @@ uniform sampler3D u_lut;
 uniform bool u_useLut;
 uniform highp float u_lutIntensity, u_lutSize;
 uniform highp vec3 u_lutMin, u_lutMax;
+// Transitions: fade towards a colour (rgb + amount), and a straight edge
+// across the canvas (direction xy, edge z, feather w).
+uniform highp vec4 u_dip;
+uniform bool u_useWipe;
+uniform highp vec4 u_wipe;
 
 highp float hash(highp vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 highp vec2 cbcr(highp vec3 c) {
@@ -138,6 +146,13 @@ void main() {
     highp float d = length((v_uv - 0.5) * 2.0) / 1.41421356;
     c.rgb *= 1.0 - u_vignette * smoothstep(u_vignetteSize, 1.0, d);
   }
+  if (u_dip.a > 0.0) c.rgb = mix(c.rgb, u_dip.rgb * c.a, u_dip.a);
+  if (u_useWipe) {
+    // Canvas position, 0 to 1, y down (clip space is y up).
+    highp vec2 pos = vec2(v_clip.x + 1.0, 1.0 - v_clip.y) * 0.5;
+    highp float d = dot(pos, u_wipe.xy);
+    c *= 1.0 - smoothstep(u_wipe.z - u_wipe.w, u_wipe.z + u_wipe.w, d);
+  }
   outColor = c * u_opacity;
 }`;
 
@@ -203,6 +218,9 @@ const FX_UNIFORMS = [
   "u_lutSize",
   "u_lutMin",
   "u_lutMax",
+  "u_dip",
+  "u_useWipe",
+  "u_wipe",
 ] as const;
 
 const MASK_SHAPE_ID = { rect: 1, ellipse: 2, linear: 3 } as const;
@@ -414,6 +432,19 @@ export class Compositor {
     if (glitch) gl.uniform1f(u("u_seed"), glitch.seed % 1000);
     gl.uniform1f(u("u_vignette"), vignette ? vignette.amount : 0);
     if (vignette) gl.uniform1f(u("u_vignetteSize"), vignette.size);
+    const { dip, wipe } = draw.style;
+    if (dip) gl.uniform4f(u("u_dip"), ...dip.color, dip.amount);
+    else gl.uniform4f(u("u_dip"), 0, 0, 0, 0);
+    gl.uniform1i(u("u_useWipe"), wipe ? 1 : 0);
+    if (wipe) {
+      gl.uniform4f(
+        u("u_wipe"),
+        wipe.dir[0],
+        wipe.dir[1],
+        wipe.edge,
+        wipe.feather,
+      );
+    }
   }
 
   private setLut(

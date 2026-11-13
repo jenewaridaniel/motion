@@ -13,6 +13,7 @@ import {
   rootComposition,
   splitLayer,
   type Track,
+  transitionLength,
   trimLayer,
   trimStartToDuration,
   US,
@@ -57,6 +58,7 @@ import {
   ZoomFitIcon,
 } from "./icons.tsx";
 import { IconButton } from "./Preview.tsx";
+import { TRANSITION_LABELS } from "./TransitionControl.tsx";
 
 /** Width of the track names column. Narrow on small screens. */
 const HeaderCtx = createContext(120);
@@ -656,6 +658,39 @@ function TrackRow({
             selected={layer.id === selection}
           />
         ))}
+        {track.magnetic &&
+          track.layers.map((layer, i) => {
+            const prev = track.layers[i - 1];
+            const tr = layer.transition;
+            if (!tr || !prev) return null;
+            const len = transitionLength(tr, prev, layer);
+            return (
+              <button
+                key={`tr-${layer.id}`}
+                type="button"
+                title={`${TRANSITION_LABELS[tr.kind]} (${(len / US).toFixed(1)} s)`}
+                aria-label={`${TRANSITION_LABELS[tr.kind]} transition`}
+                onClick={() => onSelect(layer.id)}
+                className="absolute bottom-0.5 z-[3] grid h-3.5 -translate-x-1/2 place-items-center rounded-sm bg-ink/85 text-bg hover:bg-ink"
+                style={{
+                  left: (layer.start / US) * pps,
+                  width: Math.max(14, (len / US) * pps),
+                }}
+              >
+                <svg
+                  width="10"
+                  height="8"
+                  viewBox="0 0 10 8"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M0 0 L5 4 L0 8 Z M10 0 L5 4 L10 8 Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            );
+          })}
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import {
   TEXT_LOOP_ANIMATIONS,
   TEXT_OUT_ANIMATIONS,
 } from "./model.ts";
+import { TRANSITION_KINDS } from "./transitions.ts";
 
 /** The project format this build reads and writes. */
 export const PROJECT_VERSION = 1;
@@ -171,6 +172,17 @@ function checkLayer(l: unknown, p: Obj): string | null {
     }
     if (!isObj(p.luts) || !(l.lut.id in p.luts))
       return `${where} uses a missing LUT`;
+  }
+  if (l.transition !== undefined) {
+    const tr = l.transition;
+    if (
+      !isObj(tr) ||
+      !TRANSITION_KINDS.includes(tr.kind as never) ||
+      !isNum(tr.duration) ||
+      tr.duration <= 0
+    ) {
+      return `${where} has an invalid transition`;
+    }
   }
   if (l.adjust !== undefined) {
     if (!isObj(l.adjust)) return `${where} has invalid adjustments`;

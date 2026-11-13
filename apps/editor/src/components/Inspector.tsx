@@ -33,6 +33,7 @@ import { Diamond } from "./icons.tsx";
 import { LutControl } from "./LutControl.tsx";
 import { NumberField } from "./NumberField.tsx";
 import { TextInspector } from "./TextInspector.tsx";
+import { TransitionControl } from "./TransitionControl.tsx";
 
 const ADJUST_LABELS: Record<AdjustKey, string> = {
   exposure: "Exposure",
@@ -371,6 +372,8 @@ function LayerInspector({ layer }: { layer: Layer }) {
           <LutControl layer={layer} at={at} set={set} kfButton={kfButton} />
         </Section>
       )}
+
+      {layer.kind === "media" && <TransitionControl layer={layer} />}
 
       {visual && (
         <EffectsInspector layer={layer} at={at} set={set} kfButton={kfButton} />

@@ -49,10 +49,19 @@ import {
   valueAt,
 } from "./property.ts";
 import { frameTime, type Micros } from "./time.ts";
+import {
+  DEFAULT_TRANSITION,
+  MAX_TRANSITION,
+  MIN_TRANSITION,
+  type TransitionKind,
+} from "./transitions.ts";
 
 const frame = (comp: Composition) => frameTime(1, comp.fps);
 
-/** Re-pack a magnetic track: back to back from zero, in start order. */
+/**
+ * Re-pack a magnetic track: back to back from zero, in start order. The
+ * first clip has nothing before it, so it can't have a transition in.
+ */
 export function packTrack(track: Track): void {
   if (!track.magnetic) return;
   track.layers.sort((a, b) => a.start - b.start);
@@ -61,6 +70,7 @@ export function packTrack(track: Track): void {
     l.start = t;
     t += l.duration;
   }
+  if (track.layers[0]?.transition) delete track.layers[0].transition;
 }
 
 function sortTrack(track: Track) {
@@ -168,6 +178,8 @@ export function liftToOverlay(p: Project, layerId: Id): boolean {
   const { comp, track, index } = loc;
   track.layers.splice(index, 1);
   packTrack(track);
+  // Transitions only exist between clips on the main track.
+  delete loc.layer.transition;
   const overlay = createTrack("visual", { name: "Overlay" });
   overlay.layers.push(loc.layer);
   const at = Math.max(0, comp.tracks.indexOf(track));
@@ -288,6 +300,8 @@ export function moveLayer(
   if (!fits(dest.track, target, layer.duration, layer.id)) return false;
   loc.track.layers.splice(loc.index, 1);
   if (loc.track !== dest.track) packTrack(loc.track);
+  // Transitions only exist between clips on the main track.
+  delete layer.transition;
   layer.start = target;
   dest.track.layers.push(layer);
   sortTrack(dest.track);
@@ -399,6 +413,8 @@ export function splitLayer(p: Project, layerId: Id, at: Micros): Id | null {
   if (layer.kind === "text" && layer.animation) {
     layer.animation.out = null;
   }
+  // A transition belongs to the cut before the clip: it stays on the left.
+  delete right.transition;
   // Shift keyframes so both halves keep exactly the same animation.
   forEachProperty(right, (prop) => shiftKeyframes(prop, -local));
   layer.duration = local;
@@ -651,6 +667,43 @@ export function setMaskInvert(
   const mask = findLayer(p, layerId)?.layer.mask;
   if (!mask) return false;
   mask.invert = invert;
+  return true;
+}
+
+/**
+ * Set the transition into a main-track clip from the one before it (null
+ * removes it). Keeps the length if there already was one.
+ */
+export function setTransition(
+  p: Project,
+  layerId: Id,
+  kind: TransitionKind | null,
+): boolean {
+  const loc = findLayer(p, layerId);
+  if (!loc || !loc.track.magnetic || loc.index === 0) return false;
+  if (!kind) {
+    delete loc.layer.transition;
+    return true;
+  }
+  loc.layer.transition = {
+    kind,
+    duration: loc.layer.transition?.duration ?? DEFAULT_TRANSITION,
+  };
+  return true;
+}
+
+/** Set a transition's whole length (it's centred on the cut). */
+export function setTransitionDuration(
+  p: Project,
+  layerId: Id,
+  duration: Micros,
+): boolean {
+  const loc = findLayer(p, layerId);
+  const t = loc?.layer.transition;
+  if (!t) return false;
+  t.duration = Math.round(
+    Math.min(MAX_TRANSITION, Math.max(MIN_TRANSITION, duration)),
+  );
   return true;
 }
 

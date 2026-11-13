@@ -55,6 +55,8 @@ describe("effects", () => {
       blend: "normal",
       adjust: null,
       lut: null,
+      dip: null,
+      wipe: null,
       blur: 0,
       key: null,
       mask: null,

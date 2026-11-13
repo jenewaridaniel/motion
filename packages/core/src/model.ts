@@ -3,6 +3,7 @@ import type { Adjustments, BlendMode } from "./look.ts";
 import type { LayerLut, LutAsset } from "./lut.ts";
 import { type Property, prop, type Vec2 } from "./property.ts";
 import { type Micros, sec } from "./time.ts";
+import type { Transition } from "./transitions.ts";
 
 export type Id = string;
 
@@ -61,6 +62,8 @@ interface LayerBase {
   mask?: Mask;
   /** A colour lookup table from the project's LUTs. */
   lut?: LayerLut;
+  /** Transition from the previous clip (main track only). */
+  transition?: Transition;
 }
 
 export interface MediaLayer extends LayerBase {

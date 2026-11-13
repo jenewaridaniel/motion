@@ -19,10 +19,16 @@ import {
   type Project,
   sourceTimeAt,
   type TextStyle,
+  type Track,
 } from "./model.ts";
 import { type Property, valueAt } from "./property.ts";
 import { textAnimationAt } from "./text-animation.ts";
 import type { Micros } from "./time.ts";
+import {
+  type TransitionSide,
+  transitionLength,
+  transitionSides,
+} from "./transitions.ts";
 
 /** What a draw shows. File sources are in pixels from their top-left corner. */
 export type DrawSource =
@@ -107,6 +113,57 @@ function withShake(
 
 const isActive = (l: Layer, t: Micros) => t >= l.start && t < layerEnd(l);
 
+interface DrawContext {
+  p: Project;
+  byId: Map<Id, Layer>;
+  parentMatrix: Affine;
+  parentOpacity: number;
+  keyPrefix: string;
+  out: VisualDraw[];
+  depth: number;
+  width: number;
+  height: number;
+  shortSide: number;
+}
+
+interface ActiveTransition {
+  from: Layer;
+  to: Layer;
+  sides: { from: TransitionSide; to: TransitionSide };
+}
+
+/** The two main-track clips in the middle of a transition at `t`, if any. */
+function activeTransition(
+  track: Track,
+  t: Micros,
+  width: number,
+  height: number,
+): ActiveTransition | null {
+  if (!track.magnetic) return null;
+  const layers = track.layers;
+  for (let i = 1; i < layers.length; i++) {
+    const to = layers[i];
+    const from = layers[i - 1];
+    if (!to?.transition || !from) continue;
+    const length = transitionLength(to.transition, from, to);
+    if (length <= 0) continue;
+    // Centred on the cut (the main track has no gaps, so `to.start` is it).
+    const begin = to.start - length / 2;
+    if (t < begin || t >= begin + length) continue;
+    return {
+      from,
+      to,
+      sides: transitionSides(
+        to.transition.kind,
+        (t - begin) / length,
+        width,
+        height,
+      ),
+    };
+  }
+  return null;
+}
+
 function drawComposition(
   p: Project,
   compId: Id,
@@ -119,97 +176,138 @@ function drawComposition(
 ): void {
   const comp = p.compositions[compId];
   if (!comp || depth > MAX_DEPTH) return;
-  const byId = layersById(comp);
-  const shortSide = Math.min(comp.width, comp.height);
+  const ctx: DrawContext = {
+    p,
+    byId: layersById(comp),
+    parentMatrix,
+    parentOpacity,
+    keyPrefix,
+    out,
+    depth,
+    width: comp.width,
+    height: comp.height,
+    shortSide: Math.min(comp.width, comp.height),
+  };
   // tracks[0] is on top, so draw from the last track up.
   for (let i = comp.tracks.length - 1; i >= 0; i--) {
     const track = comp.tracks[i];
     if (!track || track.hidden || track.kind !== "visual") continue;
+    const tr = activeTransition(track, t, comp.width, comp.height);
+    // Track order puts the incoming clip after (on top of) the outgoing one.
     for (const layer of track.layers) {
-      if (!isActive(layer, t)) continue;
-      const local = t - layer.start;
-      const opacity = parentOpacity * clamp01(valueAt(layer.opacity, local));
-      if (opacity <= 0) continue;
-      const matrix = withShake(
-        layer,
-        local,
-        multiply(parentMatrix, worldMatrix(layer, t, byId)),
-        shortSide,
-      );
-      const key = keyPrefix + layer.id;
-      if (layer.kind === "composition") {
-        // TODO(render-to-texture): clip nested content to the nested canvas.
-        drawComposition(
-          p,
-          layer.compositionId,
-          sourceTimeAt(layer, local),
-          matrix,
-          opacity,
-          `${key}/`,
-          out,
-          depth + 1,
-        );
-        continue;
-      }
-      if (layer.kind === "text") {
-        if (layer.text.trim() === "") continue;
-        const anim = textAnimationAt(layer, local);
-        const shown = opacity * anim.opacity;
-        if (shown <= 0) continue;
-        // Animation scales and rotates around the anchor, and offsets in the
-        // layer's own space so a slide follows the text's rotation.
-        const [ax, ay] = valueAt(layer.transform.anchor, local);
-        const extra = multiply(
-          multiply(
-            multiply(
-              translate(ax + anim.dx, ay + anim.dy),
-              rotate(anim.rotation),
-            ),
-            scale(anim.scale, anim.scale),
-          ),
-          translate(-ax, -ay),
-        );
-        out.push({
-          key,
-          layerId: layer.id,
-          source: {
-            kind: "text",
-            text: layer.text,
-            style: layer.style,
-            ...(anim.reveal < 1 ? { reveal: anim.reveal } : {}),
-          },
-          matrix: multiply(matrix, extra),
-          opacity: shown,
-          style: resolveStyle(layer, local, shortSide),
-        });
-        continue;
-      }
-      const asset = p.assets[layer.assetId];
-      if (!asset || asset.kind === "audio" || !asset.hasVideo) continue;
-      const { width, height } = asset;
-      const source: DrawSource =
-        asset.kind === "video"
-          ? {
-              kind: "video",
-              assetId: asset.id,
-              time: Math.min(
-                sourceTimeAt(layer, local),
-                Math.max(0, asset.duration - 1),
-              ),
-              width,
-              height,
-            }
-          : { kind: "image", assetId: asset.id, width, height };
-      out.push({
-        key,
-        layerId: layer.id,
-        source,
-        matrix,
-        opacity,
-        style: resolveStyle(layer, local, shortSide),
-      });
+      const side =
+        layer === tr?.from
+          ? tr.sides.from
+          : layer === tr?.to
+            ? tr.sides.to
+            : undefined;
+      if (side ? !side.visible : !isActive(layer, t)) continue;
+      drawLayer(ctx, layer, t, side);
     }
   }
+}
+
+function drawLayer(
+  ctx: DrawContext,
+  layer: Layer,
+  t: Micros,
+  side: TransitionSide | undefined,
+): void {
+  const { p, out, shortSide } = ctx;
+  // During a transition a clip is drawn a little before its start or after
+  // its end. Its settings hold their first / last values there; only the
+  // footage keeps moving (see `sourceTime` below).
+  const raw = t - layer.start;
+  const local = Math.min(Math.max(raw, 0), Math.max(0, layer.duration - 1));
+  const opacity =
+    ctx.parentOpacity *
+    clamp01(valueAt(layer.opacity, local)) *
+    (side?.opacity ?? 1);
+  if (opacity <= 0) return;
+  const own = worldMatrix(layer, layer.start + local, ctx.byId);
+  const matrix = withShake(
+    layer,
+    local,
+    multiply(ctx.parentMatrix, side ? multiply(side.matrix, own) : own),
+    shortSide,
+  );
+  const style = (): DrawStyle => {
+    const base = resolveStyle(layer, local, shortSide);
+    if (!side) return base;
+    return {
+      ...base,
+      blur: Math.hypot(base.blur, side.blur * shortSide),
+      dip: side.dip,
+      wipe: side.wipe,
+    };
+  };
+  const key = ctx.keyPrefix + layer.id;
+
+  if (layer.kind === "composition") {
+    // TODO(render-to-texture): clip nested content to the nested canvas.
+    drawComposition(
+      p,
+      layer.compositionId,
+      Math.max(0, sourceTimeAt(layer, raw)),
+      matrix,
+      opacity,
+      `${key}/`,
+      out,
+      ctx.depth + 1,
+    );
+    return;
+  }
+  if (layer.kind === "text") {
+    if (layer.text.trim() === "") return;
+    const anim = textAnimationAt(layer, local);
+    const shown = opacity * anim.opacity;
+    if (shown <= 0) return;
+    // Animation scales and rotates around the anchor, and offsets in the
+    // layer's own space so a slide follows the text's rotation.
+    const [ax, ay] = valueAt(layer.transform.anchor, local);
+    const extra = multiply(
+      multiply(
+        multiply(translate(ax + anim.dx, ay + anim.dy), rotate(anim.rotation)),
+        scale(anim.scale, anim.scale),
+      ),
+      translate(-ax, -ay),
+    );
+    out.push({
+      key,
+      layerId: layer.id,
+      source: {
+        kind: "text",
+        text: layer.text,
+        style: layer.style,
+        ...(anim.reveal < 1 ? { reveal: anim.reveal } : {}),
+      },
+      matrix: multiply(matrix, extra),
+      opacity: shown,
+      style: style(),
+    });
+    return;
+  }
+  const asset = p.assets[layer.assetId];
+  if (!asset || asset.kind === "audio" || !asset.hasVideo) return;
+  const { width, height } = asset;
+  // Footage beyond the trim points is used when a transition needs it;
+  // where the file runs out, the first / last frame holds.
+  const sourceTime = Math.min(
+    Math.max(0, sourceTimeAt(layer, raw)),
+    Math.max(0, asset.duration - 1),
+  );
+  const source: DrawSource =
+    asset.kind === "video"
+      ? { kind: "video", assetId: asset.id, time: sourceTime, width, height }
+      : { kind: "image", assetId: asset.id, width, height };
+  out.push({
+    key,
+    layerId: layer.id,
+    source,
+    matrix,
+    opacity,
+    style: style(),
+  });
 }
 
 /** Everything visible at time `t`, bottom to top. */

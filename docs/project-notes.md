@@ -250,6 +250,15 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - **Not tested:** the export dialog's own button (I called the same export function with the same LUT list it passes); real commercial LUT packs (only LUTs I generated); LUTs with a custom input range on real files (parsed and tested in core, not seen on screen); 65-point LUTs for speed; Safari and Firefox.
 - Known limits: LUTs can't be removed from a project once added (they're small); one LUT per clip.
 
+### Phase 3, stage D: transitions (2026-11-13)
+
+- Built: transitions between neighbouring clips on the main track: Dissolve, Dip to black, Dip to white, Slide left / right / up / down, Wipe left / right, Zoom, Blur. Pick one in the Transition section of a clip's settings (it's the transition from the clip before), with a Length (0.1 to 5 s, default 0.5 s). A small marker sits at each cut that has one; clicking it selects that clip.
+- How it works: the transition is centred on the cut. Clips don't move, so the video keeps its length and captions/overlays stay in sync. During the transition the old clip keeps playing past its end and the new one starts early, using the extra footage beyond the trim points; where a file has no extra footage, its first/last frame holds. A transition is never longer than either clip (the panel says when it's been shortened). Logic in `core/transitions.ts` and `evaluateFrame`, so preview and export share it.
+- Rules: the first clip can't have one (removed automatically if a clip becomes first); splitting keeps it on the left part; moving a clip to another track removes it.
+- Tested by hand (test copy on port 5181): reference frames with no transitions still identical. Pixel checks against a reference mix of the two clips' own frames: dissolve half way and dip to black within half a colour level, wipe and slide exact. Zoom, blur and dip to white checked by eye in the preview. In the editor: choosing Dissolve in the panel, the marker appearing and selecting its clip, typing a 4 s length on a 2.5 s clip (kept, used as 2.5 s, note shown), undo with Cmd+Z, reload keeps them, real playback through a transition (61 frames in the 1 s window, longest gap 27 ms, every frame had both pictures, the incoming clip used its footage from before its trim point), a clean playback through two transitions with no console errors, export (same 22 s length; the dip to white reaches pure white at the cut in the file).
+- **Not tested:** slow devices or 4K (two videos decode at once during a transition); every kind on every clip type (photos were not tested in a transition); dragging the trim handle right where a marker sits (the marker covers the bottom 14 px of the cut); transitions inside nested compositions (they can't be made in the editor yet; the wipe edge would use the whole canvas).
+- Known limits: sound still cuts hard at the cut (no audio crossfade); the old clip's settings (keyframes, effects) hold their last value while it plays past its end; no transition preview button.
+
 ## 12. Next step
 
 Agreed order (Phase 2 next):
@@ -257,7 +266,7 @@ Agreed order (Phase 2 next):
 2. ~~Thumbnails and waveforms on clips.~~ Done.
 3. ~~Phone layout and touch timeline.~~ Done (needs a real-device test pass). Re-measure export smoothness on a phone.
 4. ~~A project list~~ Done. **Phase 2 is complete** (only the real-phone test is left, and needs the user).
-Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. Next: D. transitions, E. audio tools (fades, voiceover, sound effects, extract audio), F. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
+Phase 3 (in progress): ~~A. colour, looks, blend modes~~ done. ~~B. effects and masks~~ done. ~~C. LUTs~~ done. ~~D. transitions~~ done. Next: E. audio tools (fades, voiceover, sound effects, extract audio), F. shapes and stickers, G. restyle all captions at once and resize/rotate handles on the preview, H. templates.
 Then Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; only `core` has automated tests.

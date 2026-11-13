@@ -65,6 +65,10 @@ Planned layer kinds, which slot into the same union: `shape` (paths, strokes, tr
 - **Resolving:** `core.resolveStyle` turns them into plain numbers for one moment (`VisualDraw.style`). Shake changes the layer's matrix instead.
 - **Drawing:** one fragment shader, in this order: glitch (shifted sampling), green screen, colour adjustments, LUT, mask, vignette. Blur runs first as a separate two-pass Gaussian into textures (at lower resolution for big blurs). Blend modes are GPU blend functions. The LUT is a 3D half-float texture on texture unit 1. The editor keeps parsed LUTs in `state/luts.ts` and passes them to both the preview and export (`RenderInput.luts`), so they match.
 
+## Transitions
+
+`Layer.transition` (`{ kind, duration }`) on a main-track clip is the transition from the clip before it, centred on the cut. `evaluateFrame` finds the cut whose window contains `t` and draws both clips, each changed by `transitionSides(kind, progress)`: an extra opacity, a canvas-space matrix (slide, zoom), extra blur, and two style fields only transitions set: `dip` (fade towards a colour) and `wipe` (an edge across the canvas, using the fragment's canvas position). Outside its own time range a clip's properties hold their edge values, while its source time keeps moving, so the footage past the trim points is used. Clips never move, so the timeline length is unchanged.
+
 ## Edits and undo
 
 Every change goes through `History.apply(project, recipe, mergeKey?)`. That uses Immer's `produceWithPatches` and stores forward and inverse patches. Dragging and scrubbing pass a `mergeKey`, so one whole gesture is one undo step. Edit functions in `core/edit.ts` take absolute targets (for example "trim the end to 4.2 s") instead of deltas, so repeating them during a drag is safe.
@@ -87,7 +91,7 @@ Every change goes through `History.apply(project, recipe, mergeKey?)`. That uses
 
 1. Export in a worker, only if measured stutter on weaker devices calls for it. Export already stays smooth on a Mac (see project-notes). Web Audio isn't available in workers, so audio mixing would stay on the main thread and stream chunks to the worker.
 2. Render-to-texture for whole compositions: nested-comp clipping and group opacity. (Effects, masks, blend modes and LUTs work per layer already.)
-3. Transitions (Phase 3, stage D).
+3. Audio crossfades for transitions.
 4. Shape layers (Phase 3, stage F), the graph editor, motion paths on the canvas.
 5. Device-adaptive export presets, proxies, ProRes (WASM).
 6. PWA install (vite-plugin-pwa).

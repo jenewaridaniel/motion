@@ -11,6 +11,7 @@ import {
 import type { LayerLut } from "./lut.ts";
 import { type Property, valueAt } from "./property.ts";
 import type { Micros } from "./time.ts";
+import type { Dip, Wipe } from "./transitions.ts";
 
 export const ADJUST_KEYS = [
   "exposure",
@@ -64,6 +65,10 @@ export interface DrawStyle extends ResolvedEffects {
   adjust: Record<AdjustKey, number> | null;
   /** Project LUT to apply after the adjustments, and how strongly (0 to 1). */
   lut: { id: string; intensity: number } | null;
+  /** Set by transitions only: fade towards a colour. */
+  dip: Dip | null;
+  /** Set by transitions only: show one side of an edge across the canvas. */
+  wipe: Wipe | null;
 }
 
 export function resolveStyle(
@@ -89,6 +94,8 @@ export function resolveStyle(
           ),
         }
       : null,
+    dip: null,
+    wipe: null,
     ...resolveEffects(layer, local, shortSide),
   };
 }
