@@ -106,4 +106,4 @@ Every change goes through `History.apply(project, recipe, mergeKey?)`. That uses
 3. Audio from nested compositions.
 4. Shape layers (Phase 3, stage F), the graph editor, motion paths on the canvas.
 5. Device-adaptive export presets, proxies, ProRes (WASM).
-6. PWA install (vite-plugin-pwa).
+6. ~~PWA install~~ done with a small build-time service worker (`apps/editor/pwa.ts`) instead of vite-plugin-pwa, so fonts aren't all downloaded up front.

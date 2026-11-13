@@ -318,11 +318,20 @@ Tested in a separate test copy on port 5181 (its own storage), because the user 
 - Bug found and fixed on the way: the placeholder hit test searched from the bottom track up, so a box slot over a full-screen slot couldn't be clicked (caught by the test).
 - **Not tested:** the system file dialog for "+ Add" (a test image was handed over in its place); filling a slot with a video by hand (covered by core tests); speech through the AAC encoder (a tone and a click were used); a real touch screen (touches were simulated).
 
+### Phase 4, part 1: ready to host, installable, browser check (2026-11-13)
+
+- Built:
+  - **One deployable site** for Cloudflare Pages: `pnpm build:site` puts the landing page at `/` and the editor at `/app/` in `site/`, with `_headers` (security headers, a strict content policy for the editor, long caching for files with a content hash, no-cache for the app page and service worker, microphone allowed for voiceovers) and `_redirects`. `pnpm preview:site` serves it locally with the same rules (port 5190). Steps for going online are in `docs/deploy.md`.
+  - **Installable app (PWA)** with offline use: manifest, PNG icons drawn from the same shapes as the SVG icon (`scripts/gen-icons.mjs`), and a service worker written at build time (`apps/editor/pwa.ts`) that keeps the app itself offline and saves fonts and other files as they're used. Production builds only.
+  - **Browser check at start:** without WebGL 2, WebCodecs video decoding, OffscreenCanvas, IndexedDB or Web Audio, Motion shows a clear "please update" screen instead of a broken editor; without the sound decoder or export encoders it opens and says once what won't work. Tested with fake browsers (3 tests).
+- Tested by hand on the built site (port 5190, the exact files that would go online): landing page → "Start editing free" opens `/app/`; imported a video, added text, a gradient shape, a sound effect and a voiceover (stand-in microphone), the template pictures all drew, an export finished and the file is a real 8 s 1920×1080 video; reload restored everything; no console errors at any point under the strict content policy. Offline: the service worker took control and saved the app (9 files plus the font used); with the server stopped, a reload still opened the editor with the whole project, its video frame, text font and waveforms. The "please update" screen was checked with a development-only preview; a normal load in Chrome shows the editor with no warning.
+- **Not tested:** Cloudflare itself (needs your login; the local server copies its rules but isn't Cloudflare); the browser's "Install" button and the installed window (the install prompt can't be seen from here); iPhone "Add to Home Screen"; Safari and Firefox themselves (the start-up check was tested with fake browsers, not real ones); the "won't work" message on a real browser that lacks the sound decoder; fonts never used before going offline (they fall back to a standard font).
+
 ## 12. Next step
 
 - Phase 2: complete (only the real-phone test is left, and it needs the user).
 - Phase 3: complete. A colour, looks and blend modes; B effects and masks; C LUTs; D transitions (with sound crossfades); E audio tools; F shapes and stickers; G restyle captions and canvas handles; H templates.
-- Next: Phase 4 (hosting, PWA, Safari/Firefox, public name, ProRes).
+- Phase 4: ready-to-host site, installable app and browser check done. Left: going online (needs your Cloudflare login, and \"push\" for automatic updates), testing on real Safari/Firefox/phones, the public name, ProRes.
 - Waiting on the user: a real-phone test; saying "push" to send the local commits to GitHub.
 
 Known rough edges from the review: photos larger than the GPU texture limit aren't downscaled; changing the canvas re-fits clips you resized by hand; changing speed doesn't move keyframes; export audio is resampled buffer by buffer (tiny discontinuities on non-48 kHz sources); the timeline isn't virtualised for very long projects; automated tests cover `core` and a few editor helpers (gestures, ZIP files, template fonts), not the renderer or the UI.
